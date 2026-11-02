@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { apCharacter, apUser } from '@/db/schema';
 import { encryptToken } from '@/lib/crypto';
@@ -66,6 +66,19 @@ export async function persistLogin(
       .insert(apCharacter)
       .values(values)
       .onConflictDoUpdate({ target: apCharacter.id, set: values });
+
+    // New and re-homed characters land at the end of the destination roster.
+    // Repeat logins leave `sort_order` alone (it is not in the upsert set).
+    if (existingUserId === undefined || rehomedFrom != null) {
+      const [row] = await tx
+        .select({ max: sql<number>`coalesce(max(${apCharacter.sortOrder}), -1)` })
+        .from(apCharacter)
+        .where(and(eq(apCharacter.userId, userId), ne(apCharacter.id, profile.characterId)));
+      await tx
+        .update(apCharacter)
+        .set({ sortOrder: Number(row?.max ?? -1) + 1 })
+        .where(eq(apCharacter.id, profile.characterId));
+    }
 
     if (rehomedFrom != null) {
       const remaining = await tx

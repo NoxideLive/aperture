@@ -18,10 +18,12 @@ import { cn } from '@/lib/utils';
 import {
   addCharacterAction,
   getMapTrackingAction,
+  reorderCharactersAction,
   setCharacterTrackingAction,
   signOutAction,
 } from '@/app/(app)/actions/character';
 import { AccountSettingsDialog } from '@/components/account/AccountSettingsDialog';
+import { CharacterSortList } from '@/components/chrome/CharacterSortList';
 import type { SignatureIndicatorAccountSettings, SoundPrefs } from '@/types';
 
 export type PanelCharacter = {
@@ -60,6 +62,7 @@ export function CharacterPanel({
   const params = useParams();
   const currentMapId = currentMapIdFromParams(params?.slug);
   const onMap = currentMapId !== null;
+  const [roster, setRoster] = useState(characters);
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -71,6 +74,10 @@ export function CharacterPanel({
   const [mapName, setMapName] = useState<string | null>(null);
   const [loadedMapId, setLoadedMapId] = useState<string | null>(null);
   const loaded = currentMapId !== null && loadedMapId === currentMapId;
+
+  useEffect(() => {
+    setRoster(characters);
+  }, [characters]);
 
   // Re-gate on every open/close so a reopen always waits for a fresh fetch.
   function handleOpenChange(next: boolean) {
@@ -84,14 +91,14 @@ export function CharacterPanel({
     void getMapTrackingAction(currentMapId).then((res) => {
       if (cancelled) return;
       const tracked = new Set(res.trackedIds);
-      setTracking(Object.fromEntries(characters.map((c) => [c.id, tracked.has(c.id)])));
+      setTracking(Object.fromEntries(roster.map((c) => [c.id, tracked.has(c.id)])));
       setMapName(res.mapName);
       setLoadedMapId(currentMapId);
     });
     return () => {
       cancelled = true;
     };
-  }, [open, currentMapId, characters]);
+  }, [open, currentMapId, roster]);
 
   function onToggle(id: string, next: boolean) {
     if (currentMapId === null) return;
@@ -130,13 +137,24 @@ export function CharacterPanel({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-col gap-1 px-4">
-          {characters.map((c) => {
+        <div className="px-4">
+          <CharacterSortList
+            items={roster}
+            onReorder={(next) => {
+              setRoster(next);
+              startTransition(async () => {
+                const result = await reorderCharactersAction(next.map((c) => c.id));
+                if (!result.ok) {
+                  setRoster(characters);
+                  toast.error(result.error);
+                }
+              });
+            }}
+            renderItem={(c) => {
             const isMain = c.id === mainCharacterId;
             const inactive = c.status !== 'active';
             return (
               <label
-                key={c.id}
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm',
                   inactive ? 'opacity-50' : 'hover:bg-muted',
@@ -164,7 +182,8 @@ export function CharacterPanel({
                 ) : null}
               </label>
             );
-          })}
+            }}
+          />
         </div>
 
         <div className="mt-auto flex flex-col gap-2 p-4">

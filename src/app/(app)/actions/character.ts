@@ -108,3 +108,25 @@ export async function addCharacterAction(): Promise<void> {
 export async function signOutAction(): Promise<void> {
   await signOut({ redirectTo: '/' });
 }
+
+/** Persist the account's character roster order. `orderedIds` must be every character on the account. */
+export async function reorderCharactersAction(orderedIds: string[]): Promise<TrackingResult> {
+  const session = await requireSession();
+  const rows = await db
+    .select({ id: apCharacter.id })
+    .from(apCharacter)
+    .where(eq(apCharacter.userId, session.userId));
+  const owned = new Set(rows.map((r) => r.id.toString()));
+  if (orderedIds.length !== owned.size || orderedIds.some((id) => !owned.has(id))) {
+    return { ok: false, error: 'Character list is out of date. Refresh and try again.' };
+  }
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await tx
+        .update(apCharacter)
+        .set({ sortOrder: i })
+        .where(and(eq(apCharacter.id, BigInt(orderedIds[i]!)), eq(apCharacter.userId, session.userId)));
+    }
+  });
+  return { ok: true };
+}

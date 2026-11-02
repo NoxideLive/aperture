@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db, pool } from '@/db/client';
 import { apCharacter, apUser } from '@/db/schema';
 
@@ -50,9 +50,14 @@ describe('character session helpers (real Postgres)', () => {
     expect(await assertCharacterOwnership(C_OTHER, userA)).toBe(false);
   });
 
-  it('lists every character on the account, ordered by name', async () => {
+  it('lists every character on the account in saved order, then name', async () => {
     const chars = await getAccountCharacters(userA);
     expect(chars.map((c) => c.id)).toEqual([C_ACTIVE.toString(), C_BANNED.toString()]);
     expect(chars.map((c) => c.name)).toEqual(['Alpha Pilot', 'Bravo Pilot']);
+
+    await db.update(apCharacter).set({ sortOrder: 1 }).where(eq(apCharacter.id, C_ACTIVE));
+    await db.update(apCharacter).set({ sortOrder: 0 }).where(eq(apCharacter.id, C_BANNED));
+    const reordered = await getAccountCharacters(userA);
+    expect(reordered.map((c) => c.name)).toEqual(['Bravo Pilot', 'Alpha Pilot']);
   });
 });

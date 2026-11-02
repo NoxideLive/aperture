@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Session } from 'next-auth';
 import type {
   MapLayoutConfig,
@@ -59,8 +59,8 @@ export async function getActiveCharacter() {
 }
 
 /**
- * Every character on the account, ordered by name. Returns only display-safe
- * fields — ESI tokens never leave the DB layer.
+ * Every character on the account, in the account's saved order (`sort_order`,
+ * then name). Returns only display-safe fields — ESI tokens never leave the DB layer.
  */
 export async function getAccountCharacters(userId: number): Promise<AccountCharacter[]> {
   const rows = await db
@@ -72,7 +72,7 @@ export async function getAccountCharacters(userId: number): Promise<AccountChara
     })
     .from(apCharacter)
     .where(eq(apCharacter.userId, userId))
-    .orderBy(apCharacter.name);
+    .orderBy(asc(apCharacter.sortOrder), asc(apCharacter.name));
   return rows.map((r) => ({ ...r, id: r.id.toString() }));
 }
 

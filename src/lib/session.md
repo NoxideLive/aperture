@@ -15,7 +15,7 @@ The current session; `redirect('/')` to the public splash when (a) there is no s
 The full `ap_character` row for `session.characterId`, or `null` when logged out / character missing.
 
 ### getAccountCharacters(userId: number): Promise<AccountCharacter[]>
-All characters on the account, ordered by name. Returns only display-safe fields (`id` as string, `name`, `status`, `authzLevel`) — never ESI tokens. The header Characters panel's per-map tracking checkboxes read their state from `getMapTrackingAction(mapId)`, not from this roster (tracking is per-map, not a per-character flag).
+All characters on the account in saved roster order (`sort_order`, then name). Returns only display-safe fields (`id` as string, `name`, `status`, `authzLevel`) — never ESI tokens. The header Characters panel's per-map tracking checkboxes read their state from `getMapTrackingAction(mapId)`, not from this roster (tracking is per-map, not a per-character flag).
 
 ### getMainCharacterId(userId: number): Promise<string | null>
 The account's `ap_user.main_character_id` as a string (bigint isn't JSON-safe), or `null` when unset. Feeds the Account Settings "main" selector; login-time resolution / bootstrap lives in `auth.ts` (`resolveMainCharacter`).

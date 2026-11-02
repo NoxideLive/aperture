@@ -12,6 +12,9 @@ export const apCharacter = pgTable('ap_character', {
     .notNull()
     .references(() => apUser.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  // Account roster order. Lower comes first; name is the tie-break for rows
+  // that still share the default.
+  sortOrder: integer('sort_order').notNull().default(0),
   // CCP rotates `owner_hash` when a character is transferred between accounts;
   // it is the canonical "same character" signal.
   ownerHash: text('owner_hash').notNull(),

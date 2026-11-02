@@ -15,7 +15,7 @@
 | soundPrefs | SoundPrefs | yes | The account's sound preferences, forwarded to Account settings |
 
 ### Renders
-A trigger button (active character's portrait + name) opening a right-anchored Sheet: one row per character — with a per-map tracking checkbox **when on a map** (none off-map) — then "Add character", "Account settings", and "Sign out". The description names the open map. Also renders the (initially closed) `AccountSettingsDialog`.
+A trigger button (active character's portrait + name) opening a right-anchored Sheet: one row per character in the saved account order, with a drag grip — with a per-map tracking checkbox **when on a map** (none off-map) — then "Add character", "Account settings", and "Sign out". The description names the open map. Also renders the (initially closed) `AccountSettingsDialog`.
 
 ### Behaviour & Interactions
 - `currentMapId` is derived from the `/map/[[...slug]]` route via `useParams()` (first numeric slug segment), or `null` when not on a map (e.g. `/maps`, admin pages).
@@ -24,6 +24,7 @@ A trigger button (active character's portrait + name) opening a right-anchored S
 - **Off a map:** no tracking checkboxes render at all (the roster still shows portraits/names); the description prompts the user to open a map.
 - Non-`active` (kicked/banned) characters show their status label instead of a checkbox and are dimmed.
 - The account's main is tagged "main" inline.
+- Dragging a row's grip reorders the roster and calls `reorderCharactersAction`. The same order is what Account settings and the map character menus receive from `getAccountCharacters`.
 - "Add character" / "Sign out" are `<form>`s posting `addCharacterAction` / `signOutAction` (both redirect). "Account settings" closes the Sheet and opens `AccountSettingsDialog`.
 
 ### Emits / Calls

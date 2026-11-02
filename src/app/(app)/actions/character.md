@@ -17,6 +17,9 @@ Read path for the panel: returns `{ mapName, trackedIds }` — the map's display
 ### signOutAction(): Promise<void>
 `signOut({ redirectTo: '/' })`.
 
+### reorderCharactersAction(orderedIds: string[]): Promise<TrackingResult>
+Writes `ap_character.sort_order` for the account so the ids are `0..n-1` in the given order. Rejects a list that is not exactly the account's characters.
+
 ---
 
 ### TrackingResult (type)

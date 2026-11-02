@@ -25,6 +25,8 @@ import {
   setSignatureIndicatorPrefsAction,
   setSoundPrefsAction,
 } from '@/app/(app)/actions/account';
+import { reorderCharactersAction } from '@/app/(app)/actions/character';
+import { CharacterSortList } from '@/components/chrome/CharacterSortList';
 import { DeleteAccountDialog } from './DeleteAccountDialog';
 import { SoundPicker } from './SoundPicker';
 
@@ -71,6 +73,10 @@ export function AccountSettingsDialog({
 }) {
   // Optimistic local copy so the "Main" marker moves immediately on success.
   const [mainId, setMainId] = useState(mainCharacterId);
+  const [roster, setRoster] = useState(characters);
+  useEffect(() => {
+    setRoster(characters);
+  }, [characters]);
   const [travelOn, setTravelOn] = useState(travelAnimation);
   const [pending, startTransition] = useTransition();
 
@@ -224,13 +230,23 @@ export function AccountSettingsDialog({
         </DialogHeader>
 
         <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1">
-          <div className="flex flex-col gap-1">
-            {characters.map((c) => {
+          <CharacterSortList
+            items={roster}
+            onReorder={(next) => {
+              setRoster(next);
+              startTransition(async () => {
+                const result = await reorderCharactersAction(next.map((c) => c.id));
+                if (!result.ok) {
+                  setRoster(characters);
+                  toast.error(result.error);
+                }
+              });
+            }}
+            renderItem={(c) => {
               const isMain = c.id === mainId;
               const selectable = c.status === 'active' && !isMain && !pending;
               return (
                 <div
-                  key={c.id}
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm',
                     isMain && 'bg-muted',
@@ -262,8 +278,8 @@ export function AccountSettingsDialog({
                   )}
                 </div>
               );
-            })}
-          </div>
+            }}
+          />
 
           <label className="mt-2 flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">
             <div className="flex flex-1 flex-col gap-0.5">

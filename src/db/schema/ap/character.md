@@ -10,6 +10,7 @@
 - `id` — `bigint` PK, the EVE character id (natural 64-bit key, not generated).
 - `user_id` — `integer` FK → `ap_user.id` `ON DELETE CASCADE`.
 - `name`, `owner_hash` — display name and CCP account-ownership hash (rotates on character transfer; canonical "same character" signal).
+- `sort_order` — `integer`, default `0`. Account roster order (lower first); name breaks ties.
 - `corporation_id`, `alliance_id` — nullable `bigint`. No FK to `ap_corporation`/`ap_alliance`.
 - `esi_access_token`, `esi_refresh_token` — `text`, **AES-256-GCM ciphertext blobs** from `src/lib/crypto.ts`. Never plaintext.
 - `esi_access_token_expires` — `timestamptz`.
