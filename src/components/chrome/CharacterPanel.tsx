@@ -75,10 +75,6 @@ export function CharacterPanel({
   const [loadedMapId, setLoadedMapId] = useState<string | null>(null);
   const loaded = currentMapId !== null && loadedMapId === currentMapId;
 
-  useEffect(() => {
-    setRoster(characters);
-  }, [characters]);
-
   // Re-gate on every open/close so a reopen always waits for a fresh fetch.
   function handleOpenChange(next: boolean) {
     setOpen(next);

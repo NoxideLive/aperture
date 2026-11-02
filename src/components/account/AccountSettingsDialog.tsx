@@ -74,9 +74,6 @@ export function AccountSettingsDialog({
   // Optimistic local copy so the "Main" marker moves immediately on success.
   const [mainId, setMainId] = useState(mainCharacterId);
   const [roster, setRoster] = useState(characters);
-  useEffect(() => {
-    setRoster(characters);
-  }, [characters]);
   const [travelOn, setTravelOn] = useState(travelAnimation);
   const [pending, startTransition] = useTransition();
 
