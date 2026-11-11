@@ -2335,7 +2335,7 @@ export function MapCanvas({
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="min-w-0">
-                      <div className="font-heading truncate text-base font-semibold tracking-tight">
+                      <div className="font-heading truncate text-base font-semibold tracking-tight experimental:text-lg">
                         {viewData.map.name}
                       </div>
                       <div className="text-muted-foreground truncate text-xs capitalize">
@@ -2345,7 +2345,7 @@ export function MapCanvas({
                     </div>
                     <MapShareIndicator shares={liveShares} />
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="ap-map-toolbar flex shrink-0 items-center gap-1">
                     <ActiveCharSelector />
                     <PilotRosterButton viewData={viewData} />
                     {soundsOn && <SoundToolbarButton />}
