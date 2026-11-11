@@ -27,6 +27,14 @@ import {
 } from '@/app/(app)/actions/account';
 import { DeleteAccountDialog } from './DeleteAccountDialog';
 import { SoundPicker } from './SoundPicker';
+import { useExperimentalUi } from '@/lib/experimentalUi.client';
+import type { ExperimentalUiMode } from '@/lib/experimentalUi';
+
+const EXPERIMENTAL_UI_CHOICES: { value: ExperimentalUiMode; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
 
 /** Trim a minutes value to a compact hours string for an input ("" when null). */
 function minutesToHoursInput(minutes: number | null): string {
@@ -73,6 +81,7 @@ export function AccountSettingsDialog({
   const [mainId, setMainId] = useState(mainCharacterId);
   const [travelOn, setTravelOn] = useState(travelAnimation);
   const [pending, startTransition] = useTransition();
+  const [experimentalUi, setExperimentalUi] = useExperimentalUi();
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -264,6 +273,33 @@ export function AccountSettingsDialog({
               );
             })}
           </div>
+
+          <fieldset className="mt-2 flex flex-col gap-2 rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-medium text-foreground">Experimental UI</legend>
+            <p className="text-xs text-muted-foreground">
+              Opt-in preview styling on this device. Stored in a cookie; no page reload.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {EXPERIMENTAL_UI_CHOICES.map(({ value, label }) => (
+                <label
+                  key={value}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm',
+                    experimentalUi === value && 'border-primary bg-muted',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="experimental-ui"
+                    className="size-4 accent-primary"
+                    checked={experimentalUi === value}
+                    onChange={() => setExperimentalUi(value)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <label className="mt-2 flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">
             <div className="flex flex-1 flex-col gap-0.5">
