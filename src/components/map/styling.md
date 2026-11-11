@@ -5,7 +5,10 @@
 
 ---
 
-### systemClassColor(cls: string | null | undefined): string
+### MapStylePalette / MapStyleOptions
+`palette`: `'default' | 'experimental'` (defaults to `'default'`). Optional `theme`: `'dark' | 'light'` when experimental.
+
+### systemClassColor(cls: string | null | undefined, opts?: MapStyleOptions): string
 Maps a `universe_system.security` or `universe_wormhole.target_class` label to a hex colour.
 - `H` green, `L` orange, `0.0` firetruck-red, `P` (Pochven) deep rose-red, `A` (Abyssal) teal.
 - `C1`–`C6` progress from sky-blue → cyan → emerald → amber → orange → orangy-red.

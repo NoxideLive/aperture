@@ -26,6 +26,7 @@ import { systemDisplayName, isDrifterSystem } from '@/lib/eve/drifterSystems';
 import { isShatteredSystem } from '@/lib/eve/shatteredSystems';
 import { staticCompare } from '@/lib/map/staticOrder';
 import { homeAccentColor, systemClassColor, systemEffectColor, systemStatusColor } from './styling';
+import { useMapStyleOptions } from './MapStyleContext';
 import { InlineTextEdit } from './InlineTextEdit';
 import { StaticDetailPopover } from './StaticDetailPopover';
 import { SystemPresenceTable } from './SystemPresenceTable';
@@ -67,14 +68,15 @@ function classIdFromSecurity(security: string | null): number | null {
 }
 
 export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeData }) {
-  const color = systemStatusColor(data.status);
+  const styleOpts = useMapStyleOptions();
+  const color = systemStatusColor(data.status, styleOpts);
   const isWormhole = data.statics.length > 0 || /^J\d{6}$/.test(data.name);
   const onAliasOrTagCommit = data.onAliasOrTagCommit;
   const pilots = usePresenceForSystem(data.systemId);
   const glow = useUnderglowForSystem(data.id);
   const sigIndicator = useSignatureIndicator(data.id, isWormhole);
 
-  const classColor = systemClassColor(data.security);
+  const classColor = systemClassColor(data.security, styleOpts);
   const displayName = systemDisplayName(data.systemId, data.name);
   const isDrifter = isDrifterSystem(data.systemId);
   const isShattered = isShatteredSystem(data.name);
@@ -83,7 +85,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
   // status colour (replacing the old neutral Tailwind `ring-1`), with the Home
   // accent and the selection halo stacking outside it at larger spreads so all
   // three can show at once. A soft drop shadow sits behind for slight elevation.
-  const home = homeAccentColor();
+  const home = homeAccentColor(styleOpts);
   const boxShadow = [
     `0 0 0 1px ${color}`,
     data.isHome ? `0 0 0 2px ${home}` : '',
@@ -188,7 +190,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
         <div className="flex flex-col items-center justify-center gap-0.5 border-r border-foreground/10 px-1.5 leading-none">
           <span
             className="font-mono text-sm font-bold leading-none"
-            style={{ color: systemClassColor(data.security) }}
+            style={{ color: systemClassColor(data.security, styleOpts) }}
           >
             {securityLabel(data)}
           </span>
@@ -200,14 +202,14 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
               maxLength={50}
               onCommit={(next) => onAliasOrTagCommit(data.id, 'tag', next)}
               className="font-mono text-lg font-bold leading-none empty:hidden"
-              style={{ color: systemClassColor(data.security) }}
+              style={{ color: systemClassColor(data.security, styleOpts) }}
               inputClassName="w-12"
             />
           ) : (
             data.tag && (
               <span
                 className="font-mono text-lg font-bold leading-none"
-                style={{ color: systemClassColor(data.security) }}
+                style={{ color: systemClassColor(data.security, styleOpts) }}
               >
                 {data.tag}
               </span>
@@ -267,7 +269,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
                       <StaticDetailPopover key={i} typeId={s.typeId}>
                         <span
                           className="font-bold"
-                          style={{ color: systemClassColor(s.label) }}
+                          style={{ color: systemClassColor(s.label, styleOpts) }}
                         >
                           {s.label}
                         </span>

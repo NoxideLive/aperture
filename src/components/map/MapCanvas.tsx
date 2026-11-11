@@ -160,6 +160,8 @@ import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
+import { MapStyleProvider } from './MapStyleContext';
+import type { MapStyleOptions } from './styling';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
@@ -574,6 +576,13 @@ export function MapCanvas({
   // current and complete).
   const [experimentalUi, setExperimentalUi] = useExperimentalUi();
   const experimentalActive = isExperimentalUiActive(experimentalUi);
+  const mapStyleOpts = useMemo<MapStyleOptions>(
+    () => ({
+      palette: experimentalActive ? 'experimental' : 'default',
+      theme: experimentalUi === 'light' ? 'light' : 'dark',
+    }),
+    [experimentalActive, experimentalUi],
+  );
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
     const experimentalOnLoad = isExperimentalUiActive(readExperimentalUiFromHtml());
     const base =
@@ -2077,7 +2086,7 @@ export function MapCanvas({
       setSettingsOpen,
       setMapInfoOpen,
     };
-  });
+  }, [focusPanelByShortcut, fitMapView, setExperimentalUi]);
 
   /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
   const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
@@ -2248,7 +2257,7 @@ export function MapCanvas({
               deleteKeyCode={null}
               connectionMode={ConnectionMode.Loose}
               edgesFocusable
-              colorMode="dark"
+              colorMode={experimentalActive && experimentalUi === 'light' ? 'light' : 'dark'}
               fitView={initialViewport === null}
               defaultViewport={initialViewport ?? undefined}
               zoomOnScroll={false}
@@ -2392,6 +2401,7 @@ export function MapCanvas({
   };
 
   return (
+    <MapStyleProvider value={mapStyleOpts}>
     <MapPresenceProvider initial={data.presence} mapId={data.map.id}>
       <MapActiveCharProvider viewerCharacters={viewerCharacters} mainCharacterId={mainCharacterId}>
         <MapTravelProvider>
@@ -2591,5 +2601,6 @@ export function MapCanvas({
         </MapTravelProvider>
       </MapActiveCharProvider>
     </MapPresenceProvider>
+    </MapStyleProvider>
   );
 }

@@ -7,9 +7,20 @@ import { roundSecurity } from '@/lib/sde/security';
 // explicit values so the canvas is readable without Tailwind tokens leaking
 // into SVG.
 
+export type MapStylePalette = 'default' | 'experimental';
+
+export type MapStyleOptions = {
+  palette?: MapStylePalette;
+  theme?: 'dark' | 'light';
+};
+
+function resolved(opts?: MapStyleOptions): Required<MapStyleOptions> {
+  return { palette: opts?.palette ?? 'default', theme: opts?.theme ?? 'dark' };
+}
+
 // Covers universe_system.security labels: H, L, 0.0, C1–C6, P (Pochven), A (Abyssal).
 // C1–C6 progress from cool blue to orangy-red to signal increasing danger.
-const SYSTEM_CLASS_COLORS: Partial<Record<string, string>> = {
+const DEFAULT_SYSTEM_CLASS_COLORS: Partial<Record<string, string>> = {
   H: '#22c55e',    // high-sec — green
   L: '#fb923c',    // low-sec — orange
   '0.0': '#dc2626', // null-sec — firetruck red
@@ -23,10 +34,49 @@ const SYSTEM_CLASS_COLORS: Partial<Record<string, string>> = {
   C6: '#ea580c',   // orangy-red
 };
 
+const EXPERIMENTAL_SYSTEM_CLASS_DARK: Partial<Record<string, string>> = {
+  H: '#3DDC97',
+  L: '#F0A04B',
+  '0.0': '#F07167',
+  P: '#E85D8C',
+  A: '#2DD4C8',
+  C1: '#5EC8FF',
+  C2: '#3BA3F0',
+  C3: '#C5D63A',
+  C4: '#F5C518',
+  C5: '#FF8A3D',
+  C6: '#FF6B4A',
+};
+
+const EXPERIMENTAL_SYSTEM_CLASS_LIGHT: Partial<Record<string, string>> = {
+  H: '#0B7A4B',
+  L: '#C45C00',
+  '0.0': '#B42318',
+  P: '#9F1239',
+  A: '#0F766E',
+  C1: '#0369A1',
+  C2: '#075985',
+  C3: '#4D7C0F',
+  C4: '#A16207',
+  C5: '#C2410C',
+  C6: '#9A3412',
+};
+
+function systemClassTable(opts?: MapStyleOptions) {
+  const { palette, theme } = resolved(opts);
+  if (palette === 'default') return DEFAULT_SYSTEM_CLASS_COLORS;
+  return theme === 'light' ? EXPERIMENTAL_SYSTEM_CLASS_LIGHT : EXPERIMENTAL_SYSTEM_CLASS_DARK;
+}
+
 /** Colour for a `universe_system.security` or `universe_wormhole.target_class` label. */
-export function systemClassColor(cls: string | null | undefined): string {
-  if (!cls) return '#6b7280';
-  return SYSTEM_CLASS_COLORS[cls] ?? '#6b7280';
+export function systemClassColor(
+  cls: string | null | undefined,
+  opts?: MapStyleOptions,
+): string {
+  const table = systemClassTable(opts);
+  const fallback = resolved(opts).palette === 'default' ? '#6b7280' : '#94A3B8';
+  if (!cls) return fallback;
+  return table[cls] ?? fallback;
 }
 
 // CCP's canonical security-status gradient, keyed by the displayed value (true
@@ -62,14 +112,19 @@ export function trueSecColor(sec: number): string {
 export function systemSecurityColor(
   label: string | null | undefined,
   securityStatus: number | null | undefined,
+  opts?: MapStyleOptions,
 ): string {
-  if (securityStatus != null && (label === 'H' || label === 'L' || label === '0.0')) {
+  if (
+    resolved(opts).palette === 'default' &&
+    securityStatus != null &&
+    (label === 'H' || label === 'L' || label === '0.0')
+  ) {
     return trueSecColor(securityStatus);
   }
-  return systemClassColor(label);
+  return systemClassColor(label, opts);
 }
 
-const STATUS_COLORS: Record<MapSystemNode['status'], string> = {
+const DEFAULT_STATUS_COLORS: Record<MapSystemNode['status'], string> = {
   unknown: '#6b7280',
   friendly: '#3b82f6',
   occupied: '#f59e0b',
@@ -78,17 +133,46 @@ const STATUS_COLORS: Record<MapSystemNode['status'], string> = {
   unscanned: '#a855f7',
 };
 
-export function systemStatusColor(status: MapSystemNode['status']): string {
-  return STATUS_COLORS[status];
+const EXPERIMENTAL_STATUS_DARK: Record<MapSystemNode['status'], string> = {
+  unknown: '#94A3B8',
+  friendly: '#5B9DFF',
+  occupied: '#F5B942',
+  hostile: '#FF5C5C',
+  empty: '#3DDC97',
+  unscanned: '#C084FC',
+};
+
+const EXPERIMENTAL_STATUS_LIGHT: Record<MapSystemNode['status'], string> = {
+  unknown: '#475569',
+  friendly: '#1D4ED8',
+  occupied: '#B45309',
+  hostile: '#B91C1C',
+  empty: '#0B7A4B',
+  unscanned: '#7E22CE',
+};
+
+function statusColors(opts?: MapStyleOptions) {
+  const { palette, theme } = resolved(opts);
+  if (palette === 'default') return DEFAULT_STATUS_COLORS;
+  return theme === 'light' ? EXPERIMENTAL_STATUS_LIGHT : EXPERIMENTAL_STATUS_DARK;
+}
+
+export function systemStatusColor(
+  status: MapSystemNode['status'],
+  opts?: MapStyleOptions,
+): string {
+  return statusColors(opts)[status];
 }
 
 // Reserved for the Home-system marker (accent ring + header icon). Kept distinct
 // from the status palette so it never reads as a system status.
-const HOME_ACCENT = '#fbbf24'; // amber/gold
+const DEFAULT_HOME_ACCENT = '#fbbf24';
 
 /** Accent colour for the designated Home system's ring and header icon. */
-export function homeAccentColor(): string {
-  return HOME_ACCENT;
+export function homeAccentColor(opts?: MapStyleOptions): string {
+  const { palette, theme } = resolved(opts);
+  if (palette === 'default') return DEFAULT_HOME_ACCENT;
+  return theme === 'light' ? '#B45309' : '#FBBF24';
 }
 
 // Map-note severity → border colour. `neutral` matches the file's default grey
@@ -121,28 +205,56 @@ export function systemEffectColor(key: SystemEffectKey): string {
   return SYSTEM_EFFECT_COLORS[key];
 }
 
-const MASS_COLORS: Record<MapConnectionEdge['massStatus'], string> = {
+const DEFAULT_MASS_COLORS: Record<MapConnectionEdge['massStatus'], string> = {
   fresh: '#84cc16',
   reduced: '#f59e0b',
   critical: '#ef4444',
 };
 
-const SCOPE_COLORS: Record<MapConnectionEdge['scope'], string> = {
+const EXPERIMENTAL_MASS_DARK: Record<MapConnectionEdge['massStatus'], string> = {
+  fresh: '#86EF63',
+  reduced: '#F5B942',
+  critical: '#FF5C5C',
+};
+
+const EXPERIMENTAL_MASS_LIGHT: Record<MapConnectionEdge['massStatus'], string> = {
+  fresh: '#3F9C1F',
+  reduced: '#B45309',
+  critical: '#B91C1C',
+};
+
+const DEFAULT_SCOPE_COLORS: Record<MapConnectionEdge['scope'], string> = {
   wh: '#cbd5e1',
   stargate: '#4ade80',
   jumpbridge: '#a855f7',
   abyssal: '#f97316',
 };
 
+const EXPERIMENTAL_SCOPE_DARK: Record<MapConnectionEdge['scope'], string> = {
+  wh: '#CBD5E1',
+  stargate: '#4ADE80',
+  jumpbridge: '#C084FC',
+  abyssal: '#f97316',
+};
+
+const EXPERIMENTAL_SCOPE_LIGHT: Record<MapConnectionEdge['scope'], string> = {
+  wh: '#334155',
+  stargate: '#15803D',
+  jumpbridge: '#7E22CE',
+  abyssal: '#C2410C',
+};
+
 // Warp-bubble marker at a connection mouth. A cold, bright ice blue: held apart
 // from the mass/scope palette so a bubble never reads as connection state, and
 // high enough in luminance to carry against the near-black canvas at the low
 // alphas the ring fill and wash use.
-const BUBBLE_COLOR = '#9ec9f0';
+const DEFAULT_BUBBLE_COLOR = '#9ec9f0';
 
 /** Fill/stroke hue for the bubbled-end marker and its wash. */
-export function connectionBubbleColor(): string {
-  return BUBBLE_COLOR;
+export function connectionBubbleColor(opts?: MapStyleOptions): string {
+  const { palette, theme } = resolved(opts);
+  if (palette === 'default') return DEFAULT_BUBBLE_COLOR;
+  return theme === 'light' ? '#0369A1' : '#7DD3FC';
 }
 
 // The hover-revealed handle at a connection mouth. Neutral by design — it marks
@@ -170,11 +282,26 @@ export type EdgeStyle = {
  */
 export function connectionStyle(
   edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
+  opts?: MapStyleOptions,
 ): EdgeStyle {
-  const stroke = edge.scope === 'wh' ? MASS_COLORS[edge.massStatus] : SCOPE_COLORS[edge.scope];
+  const { palette, theme } = resolved(opts);
+  const mass =
+    palette === 'default'
+      ? DEFAULT_MASS_COLORS
+      : theme === 'light'
+        ? EXPERIMENTAL_MASS_LIGHT
+        : EXPERIMENTAL_MASS_DARK;
+  const scope =
+    palette === 'default'
+      ? DEFAULT_SCOPE_COLORS
+      : theme === 'light'
+        ? EXPERIMENTAL_SCOPE_LIGHT
+        : EXPERIMENTAL_SCOPE_DARK;
+  const stroke = edge.scope === 'wh' ? mass[edge.massStatus] : scope[edge.scope];
+  const strokeWidth = edge.jumpMassClass === 's' ? (palette === 'experimental' ? 2 : 1.5) : 3;
   return {
     stroke,
-    strokeWidth: edge.jumpMassClass === 's' ? 1.5 : 3,
+    strokeWidth,
     strokeDasharray:
       edge.eolStage === 'expired'
         ? '1 4'

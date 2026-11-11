@@ -7,6 +7,7 @@ import type { ConnectionEnd } from '@/types';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Eye, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
 import { connectionBadges, connectionStyle } from './styling';
+import { useMapStyleOptions } from './MapStyleContext';
 import { useTravelForConnection } from './MapTravelContext';
 import { useIsConnectionWatched } from '@/lib/connectionWatchPrefs';
 import { ConnectionDetailPopover } from './ConnectionDetailPopover';
@@ -93,7 +94,8 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
   const [hovered, setHovered] = useState(false);
   const [hoveredEnd, setHoveredEnd] = useState<ConnectionEnd | null>(null);
 
-  const style = connectionStyle(data);
+  const styleOpts = useMapStyleOptions();
+  const style = connectionStyle(data, styleOpts);
   const lineWeight = selected ? 2 : hovered && hoveredEnd === null ? 1.5 : 0;
   const finalStyle = lineWeight
     ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + lineWeight }
