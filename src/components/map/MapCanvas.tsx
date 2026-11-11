@@ -164,6 +164,7 @@ import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
 import {
   DEFAULT_MAP_LAYOUT,
+  defaultMapLayoutForUi,
   PANELS,
   PANEL_COLS,
   PANEL_MIN,
@@ -174,7 +175,7 @@ import {
 } from '@/lib/map/layout/panels';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
-import { isExperimentalUiActive } from '@/lib/experimentalUi';
+import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
@@ -569,9 +570,13 @@ export function MapCanvas({
   // current and complete).
   const [experimentalUi] = useExperimentalUi();
   const experimentalActive = isExperimentalUiActive(experimentalUi);
-  const [layout, setLayout] = useState<MapLayoutConfig>(() =>
-    ensurePanelsPlaced(dedupeGroups(migrateLayout(mapLayout ?? DEFAULT_MAP_LAYOUT))),
-  );
+  const [layout, setLayout] = useState<MapLayoutConfig>(() => {
+    const experimentalOnLoad = isExperimentalUiActive(readExperimentalUiFromHtml());
+    const base =
+      mapLayout ??
+      defaultMapLayoutForUi(experimentalOnLoad);
+    return ensurePanelsPlaced(dedupeGroups(migrateLayout(base)));
+  });
   // The grid's active responsive breakpoint (reported by `MapLayoutGrid`). Grouping
   // is per-breakpoint, so the rendered cells read from `layout.groups[breakpoint]`.
   const [breakpoint, setBreakpoint] = useState<Breakpoint>('lg');

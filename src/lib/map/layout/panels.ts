@@ -119,6 +119,70 @@ export const DEFAULT_MAP_LAYOUT: MapLayoutConfig = {
   hidden: [],
 };
 
+const EXPERIMENTAL_RIGHT_MEMBERS: PanelId[] = [
+  'inspector',
+  'route',
+  'intel',
+  'structure',
+  'killStats',
+  'systemKillboard',
+  'thera',
+  'systemGraph',
+  'tags',
+];
+
+function experimentalWideLayout(cols: number) {
+  const leftW = cols === 12 ? 8 : 5;
+  const rightX = leftW;
+  const rightW = cols - leftW;
+  const workbenchId: PanelId = 'inspector';
+  return [
+    { i: 'canvas' as PanelId, x: 0, y: 0, w: leftW, h: 12, ...PANEL_MIN.canvas },
+    { i: 'signatures' as PanelId, x: 0, y: 12, w: leftW, h: 8, ...PANEL_MIN.signatures },
+  {
+      i: workbenchId,
+      x: rightX,
+      y: 0,
+      w: rightW,
+      h: 16,
+      ...PANEL_MIN[workbenchId],
+    },
+  ];
+}
+
+const experimentalLayouts: Record<Breakpoint, Layout> = {
+  lg: experimentalWideLayout(12),
+  md: experimentalWideLayout(8),
+  sm: stackedLayout,
+};
+
+const experimentalGroupsLg: PanelGroup[] = [
+  { id: 'canvas', members: ['canvas'], active: 'canvas' },
+  { id: 'signatures', members: ['signatures'], active: 'signatures' },
+  {
+    id: 'inspector',
+    members: EXPERIMENTAL_RIGHT_MEMBERS,
+    active: 'inspector',
+  },
+];
+
+/** Default dashboard when `ap_user.map_layout` is null and experimental UI is on. */
+export const EXPERIMENTAL_DEFAULT_MAP_LAYOUT: MapLayoutConfig = {
+  version: LAYOUT_CONFIG_VERSION,
+  layouts: experimentalLayouts,
+  groups: {
+    lg: experimentalGroupsLg,
+    md: experimentalGroupsLg,
+    sm: singletonGroups(stackedLayout),
+  },
+  hidden: ['sigSearch'],
+};
+
+/** Pick the built-in default for users without a saved layout. */
+export function defaultMapLayoutForUi(experimental: boolean): MapLayoutConfig {
+  return experimental ? EXPERIMENTAL_DEFAULT_MAP_LAYOUT : DEFAULT_MAP_LAYOUT;
+}
+
 // Fallback geometry for a panel that shipped after the user last saved their
 // layout — auto-placed at the bottom of each breakpoint on load.
 const APPENDED_PANEL_W = 4;
