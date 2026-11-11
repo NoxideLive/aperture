@@ -1002,6 +1002,7 @@ function SignaturePanelBody({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="ap-signature-sticky-chrome">
       <SignatureFilterBar
         groupFilter={groupFilter}
         onGroupFilterChange={setGroupFilter}
@@ -1009,7 +1010,8 @@ function SignaturePanelBody({
         onScanFilterChange={setScanFilter}
         stats={sigStats}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
+      </div>
+      <div className="ap-signature-table-scroll min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm [&_[data-slot=input]]:h-6 [&_[data-slot=select-trigger]]:h-6">
           <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-[11px] uppercase text-muted-foreground">
             {table.getHeaderGroups().map((hg) => (

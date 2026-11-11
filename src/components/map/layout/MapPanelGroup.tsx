@@ -7,8 +7,11 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X } from 'lucide-react';
+import { ChevronDown, GripVertical, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
+
+import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -108,6 +111,24 @@ export function MapPanelGroup({
   const { setNodeRef: setDroppableRef, isOver, active } = useDroppable({
     id: `grp:${group.id}`,
   });
+  const experimental = isExperimentalUiActive(readExperimentalUiFromHtml());
+  const collapseKey = `experimental-panel-collapsed:${group.id}`;
+  const [collapsed, setCollapsed] = useState(() => {
+    if (!isExperimentalUiActive(readExperimentalUiFromHtml())) return false;
+    try {
+      return sessionStorage.getItem(collapseKey) === '1';
+    } catch {
+      return false;
+    }
+  });
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      if (next) sessionStorage.setItem(collapseKey, '1');
+      else sessionStorage.removeItem(collapseKey);
+    } catch {}
+  }
   if (visibleMembers.length === 0) return null;
   const activeMember = visibleMembers.includes(group.active) ? group.active : visibleMembers[0]!;
   const isSingle = visibleMembers.length === 1;
@@ -143,6 +164,20 @@ export function MapPanelGroup({
           </SortableContext>
         </div>
         <div className={cn(PANEL_NO_DRAG_CLASS, 'ml-auto flex items-center gap-1')}>
+          {experimental ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+              onClick={toggleCollapsed}
+            >
+              <ChevronDown
+                className={cn('size-3.5 transition-transform', collapsed && '-rotate-90')}
+              />
+            </Button>
+          ) : null}
           {renderHeaderRight(activeMember)}
           {isSingle && (
             <Button
@@ -157,18 +192,26 @@ export function MapPanelGroup({
           )}
         </div>
       </div>
-      <div
-        className={cn(
-          // Card-in-card dedupe: most modules render their own <Card> as the body's
-          // direct child. Strip that card's frame (ring + rounded corners) so the
-          // panel reads as a single card. The canvas body is a plain div, so this
-          // variant simply doesn't match it.
-          '[&>[data-slot=card]]:rounded-none [&>[data-slot=card]]:ring-0',
-          contentClassName?.(activeMember) ?? 'min-h-0 flex-1 overflow-auto p-0',
-        )}
-      >
-        {renderContent(activeMember)}
-      </div>
+      {!collapsed || !experimental ? (
+        <div
+          data-panel-id={activeMember}
+          data-layout-item-id={group.id}
+          className={cn(
+            // Card-in-card dedupe: most modules render their own <Card> as the body's
+            // direct child. Strip that card's frame (ring + rounded corners) so the
+            // panel reads as a single card. The canvas body is a plain div, so this
+            // variant simply doesn't match it.
+            '[&>[data-slot=card]]:rounded-none [&>[data-slot=card]]:ring-0',
+            experimental && activeMember !== 'canvas' && 'ap-map-panel-body',
+            contentClassName?.(activeMember) ??
+              (experimental && activeMember !== 'canvas'
+                ? 'ap-map-panel-body min-h-0 flex-1 p-0'
+                : 'min-h-0 flex-1 overflow-auto p-0'),
+          )}
+        >
+          {renderContent(activeMember)}
+        </div>
+      ) : null}
     </Card>
   );
 }

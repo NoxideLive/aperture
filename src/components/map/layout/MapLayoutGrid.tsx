@@ -19,7 +19,8 @@ import type { Breakpoint, PanelId } from '@/types';
 import { PANEL_DRAG_HANDLE_CLASS, PANEL_NO_DRAG_CLASS } from './MapPanelGroup';
 
 // Pixel height of one grid row; a layout item's `h` multiplies this.
-const ROW_HEIGHT = 40;
+export const MAP_LAYOUT_ROW_HEIGHT = 40;
+const ROW_HEIGHT = MAP_LAYOUT_ROW_HEIGHT;
 // [horizontal, vertical] gap between grid items, in px. Also used as the grid's
 // `containerPadding` so RGL's own placement math (reused for the tear-off ghost)
 // is fully determined by these constants rather than RGL's implicit default.
@@ -163,7 +164,7 @@ export function MapLayoutGrid({
   }, [layouts]);
 
   return (
-    <div ref={setContainerRefs} className="relative h-full w-full">
+    <div ref={setContainerRefs} className="ap-map-dashboard relative h-full w-full">
       {mounted ? (
         <ResponsiveGridLayout<Breakpoint>
           width={width}

@@ -159,7 +159,7 @@ import { MapNoteNode, type MapNoteNodeData } from './MapNoteNode';
 import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
-import { MapLayoutGrid } from './layout/MapLayoutGrid';
+import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
 import {
@@ -174,6 +174,8 @@ import {
 } from '@/lib/map/layout/panels';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
+import { isExperimentalUiActive } from '@/lib/experimentalUi';
+import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
@@ -565,6 +567,8 @@ export function MapCanvas({
   // a saved layout (a panel that shipped after the user last saved). All are
   // normalisers, no data migration. No-ops for `DEFAULT_MAP_LAYOUT` (already
   // current and complete).
+  const [experimentalUi] = useExperimentalUi();
+  const experimentalActive = isExperimentalUiActive(experimentalUi);
   const [layout, setLayout] = useState<MapLayoutConfig>(() =>
     ensurePanelsPlaced(dedupeGroups(migrateLayout(mapLayout ?? DEFAULT_MAP_LAYOUT))),
   );
@@ -576,6 +580,7 @@ export function MapCanvas({
   // first call updates local state but must not persist (no spurious write per
   // map open). Subsequent (user-driven) changes save.
   const firstLayoutChange = useRef(true);
+  const layoutPersistSkipRef = useRef(false);
 
   const saveLayout = useCallback((config: MapLayoutConfig) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -599,13 +604,63 @@ export function MapCanvas({
     (_current: Layout, all: ResponsiveLayouts<Breakpoint>) => {
       setLayout((prev) => {
         const next: MapLayoutConfig = { ...prev, layouts: mergeLayouts(prev.layouts, all) };
-        if (!firstLayoutChange.current) saveLayout(next);
+        if (!firstLayoutChange.current && !layoutPersistSkipRef.current) saveLayout(next);
         firstLayoutChange.current = false;
+        layoutPersistSkipRef.current = false;
         return next;
       });
     },
     [saveLayout],
   );
+
+  // Experimental: grow grid rows to fit panel content without persisting heights.
+  useEffect(() => {
+    if (!experimentalActive) return;
+    const measure = () => {
+      const bp = breakpoint;
+      const panels = document.querySelectorAll<HTMLElement>('[data-layout-item-id]');
+      if (panels.length === 0) return;
+      const heightByItem = new Map<string, number>();
+      for (const el of panels) {
+        const layoutId = el.getAttribute('data-layout-item-id');
+        const panelId = el.getAttribute('data-panel-id');
+        if (!layoutId || panelId === 'canvas') continue;
+        const measured = el.scrollHeight + 16;
+        const minH = PANEL_MIN[panelId as PanelId]?.minH ?? 2;
+        const rows = Math.max(minH, Math.ceil(measured / MAP_LAYOUT_ROW_HEIGHT));
+        const prev = heightByItem.get(layoutId) ?? 0;
+        heightByItem.set(layoutId, Math.max(prev, rows));
+      }
+      if (heightByItem.size === 0) return;
+      setLayout((prev) => {
+        const items = prev.layouts[bp] ?? [];
+        let changed = false;
+        const nextItems = items.map((item) => {
+          const rows = heightByItem.get(item.i);
+          if (rows == null || rows === item.h) return item;
+          changed = true;
+          return { ...item, h: rows };
+        });
+        if (!changed) return prev;
+        layoutPersistSkipRef.current = true;
+        return { ...prev, layouts: { ...prev.layouts, [bp]: nextItems } };
+      });
+    };
+    const ro = new ResizeObserver(() => requestAnimationFrame(measure));
+    const nodes = () => document.querySelectorAll<HTMLElement>('[data-layout-item-id]');
+    const wire = () => {
+      ro.disconnect();
+      for (const n of nodes()) ro.observe(n);
+      measure();
+    };
+    wire();
+    const mo = new MutationObserver(() => wire());
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [experimentalActive, breakpoint]);
 
   // Hide a panel (tab ✕ or panels-menu uncheck). The panel leaves its group's
   // tab strip in every breakpoint (`removePanelFromLayout` re-keys/drops the
@@ -2271,7 +2326,7 @@ export function MapCanvas({
                 onLazyDeleteConsume={() => setLazyDeleteSigs(false)}
                 onLazyDeletePasteResult={onLazyDeletePasteResult}
               />
-              <div className="flex flex-col gap-2">
+              <div className="ap-map-dashboard flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="min-w-0">
@@ -2374,9 +2429,14 @@ export function MapCanvas({
                           onHideMember={handleHide}
                           renderContent={panelContent}
                           renderHeaderRight={panelHeaderRight}
-                          contentClassName={(id) =>
-                            id === 'canvas' ? 'min-h-0 flex-1 overflow-hidden p-0' : undefined
-                          }
+                          contentClassName={(id) => {
+                            if (id === 'canvas') {
+                              return experimentalActive
+                                ? 'min-h-[40vh] flex-1 overflow-hidden p-0'
+                                : 'min-h-0 flex-1 overflow-hidden p-0';
+                            }
+                            return undefined;
+                          }}
                         />
                       </div>
                     ))}
