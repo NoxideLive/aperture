@@ -1,0 +1,51 @@
+/* Experimental chrome tokens — active only when `data-ui="experimental"` is on <html>. */
+
+[data-ui="experimental"][data-theme="dark"] {
+  color-scheme: dark;
+  --background: #121821;
+  --foreground: #e8eef4;
+  --card: #1b2430;
+  --card-foreground: #e8eef4;
+  --popover: #1b2430;
+  --popover-foreground: #e8eef4;
+  --primary: #5b9dff;
+  --primary-foreground: #0b1220;
+  --secondary: #243044;
+  --secondary-foreground: #e8eef4;
+  --muted: #243044;
+  --muted-foreground: #a8b4c4;
+  --accent: #243044;
+  --accent-foreground: #e8eef4;
+  --destructive: #ff6b6b;
+  --border: #334155;
+  --input: #334155;
+  --ring: #5b9dff;
+  --map-node: #243044;
+  --radius: 0.5rem;
+  --xy-background-color: #1c2430;
+}
+
+[data-ui="experimental"][data-theme="light"] {
+  color-scheme: light;
+  --background: #f4f6f8;
+  --foreground: #1a2330;
+  --card: #ffffff;
+  --card-foreground: #1a2330;
+  --popover: #ffffff;
+  --popover-foreground: #1a2330;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #e6ebf1;
+  --secondary-foreground: #1a2330;
+  --muted: #e6ebf1;
+  --muted-foreground: #5c6b7c;
+  --accent: #e6ebf1;
+  --accent-foreground: #1a2330;
+  --destructive: #b91c1c;
+  --border: #d0d7e0;
+  --input: #d0d7e0;
+  --ring: #1d4ed8;
+  --map-node: #ffffff;
+  --radius: 0.5rem;
+  --xy-background-color: #e8eef4;
+}
