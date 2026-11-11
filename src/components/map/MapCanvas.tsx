@@ -159,6 +159,7 @@ import { MapNoteNode, type MapNoteNodeData } from './MapNoteNode';
 import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
+import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
@@ -181,6 +182,8 @@ import { toast } from 'sonner';
 
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
+
+const COMMAND_PANEL_FOCUS_ORDER: PanelId[] = ['signatures', 'inspector', 'route', 'intel'];
 
 // Cadence for re-pulling read-side per-system intel/stats for systems already on
 // the map. Floored at the ~5min server refresh-job cadence — polling faster than
@@ -383,6 +386,7 @@ export function MapCanvas({
   const [disconnectedPreview, setDisconnectedPreview] = useState<{ count: number } | null>(null);
   const [mapInfoOpen, setMapInfoOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [addSystemOpen, setAddSystemOpen] = useState(false);
   const [sigSearchFilters, setSigSearchFilters] = useState<SigSearchFilters>({
@@ -568,7 +572,7 @@ export function MapCanvas({
   // a saved layout (a panel that shipped after the user last saved). All are
   // normalisers, no data migration. No-ops for `DEFAULT_MAP_LAYOUT` (already
   // current and complete).
-  const [experimentalUi] = useExperimentalUi();
+  const [experimentalUi, setExperimentalUi] = useExperimentalUi();
   const experimentalActive = isExperimentalUiActive(experimentalUi);
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
     const experimentalOnLoad = isExperimentalUiActive(readExperimentalUiFromHtml());
@@ -2039,6 +2043,106 @@ export function MapCanvas({
     g.members.some((m) => !layout.hidden.includes(m)),
   );
 
+  const focusPanelByShortcut = useCallback(
+    (index: 0 | 1 | 2 | 3) => {
+      const id = COMMAND_PANEL_FOCUS_ORDER[index]!;
+      const group = (layout.groups[breakpoint] ?? []).find((g) => g.members.includes(id));
+      if (!group) return;
+      if (group.active !== id) handleSetActiveTab(group.id, id);
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-layout-item-id="${group.id}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    },
+    [breakpoint, handleSetActiveTab, layout.groups],
+  );
+
+  const fitMapView = useCallback(() => {
+    flowInstance.current?.fitView({ padding: 0.15, duration: 300 });
+  }, []);
+
+  const commandHandlersRef = useRef({
+    focusPanelByShortcut,
+    fitMapView,
+    setExperimentalUi,
+    setSettingsOpen,
+    setMapInfoOpen,
+  });
+  useEffect(() => {
+    commandHandlersRef.current = {
+      focusPanelByShortcut,
+      fitMapView,
+      setExperimentalUi,
+      setSettingsOpen,
+      setMapInfoOpen,
+    };
+  });
+
+  /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
+  const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
+    const actions: import('./MapCommandPalette').MapCommandAction[] = [
+      {
+        id: 'settings',
+        label: 'Map settings',
+        keywords: 'preferences',
+        run: () => commandHandlersRef.current.setSettingsOpen(true),
+      },
+      {
+        id: 'info',
+        label: 'Map info',
+        run: () => commandHandlersRef.current.setMapInfoOpen(true),
+      },
+      {
+        id: 'fit',
+        label: 'Fit map',
+        hint: 'f',
+        run: () => commandHandlersRef.current.fitMapView(),
+      },
+      {
+        id: 'maps',
+        label: 'Go to maps list',
+        keywords: 'home',
+        run: () => {
+          window.location.href = '/maps';
+        },
+      },
+      {
+        id: 'exp-off',
+        label: 'Experimental UI: Off',
+        run: () => commandHandlersRef.current.setExperimentalUi('off'),
+      },
+      {
+        id: 'exp-dark',
+        label: 'Experimental UI: Dark',
+        run: () => commandHandlersRef.current.setExperimentalUi('dark'),
+      },
+      {
+        id: 'exp-light',
+        label: 'Experimental UI: Light',
+        run: () => commandHandlersRef.current.setExperimentalUi('light'),
+      },
+    ];
+    for (const [idx, panel] of COMMAND_PANEL_FOCUS_ORDER.entries()) {
+      actions.push({
+        id: `focus-${panel}`,
+        label: `Focus ${PANELS.find((p) => p.id === panel)?.title ?? panel}`,
+        hint: String(idx + 1),
+        run: () => commandHandlersRef.current.focusPanelByShortcut(idx as 0 | 1 | 2 | 3),
+      });
+    }
+    return actions;
+  }, []);
+  /* eslint-enable react-hooks/refs */
+
+  useMapCommandPaletteKeyboard({
+    enabled: experimentalActive,
+    actions: commandActions,
+    onOpenChange: setCommandOpen,
+    onFitView: fitMapView,
+    onFocusPanel: focusPanelByShortcut,
+  });
+
   // The JSX for one panel's body. The canvas keeps its own positioned wrapper
   // (overlays + menu + dialog); the rest are the existing sidebar/signature
   // modules with unchanged props.
@@ -2449,6 +2553,13 @@ export function MapCanvas({
                 </PanelDndContext>
               </div>
 
+              {experimentalActive ? (
+                <MapCommandPalette
+                  open={commandOpen}
+                  onOpenChange={setCommandOpen}
+                  actions={commandActions}
+                />
+              ) : null}
               <MapInfoDialog open={mapInfoOpen} onOpenChange={setMapInfoOpen} viewData={viewData} />
               <MapSettingsDialog
                 open={settingsOpen}
