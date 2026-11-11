@@ -2077,7 +2077,7 @@ export function MapCanvas({
       setSettingsOpen,
       setMapInfoOpen,
     };
-  });
+  }, [focusPanelByShortcut, fitMapView, setExperimentalUi, setSettingsOpen, setMapInfoOpen]);
 
   /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
   const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
