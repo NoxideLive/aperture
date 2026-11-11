@@ -2086,7 +2086,11 @@ export function MapCanvas({
       setSettingsOpen,
       setMapInfoOpen,
     };
+<<<<<<< HEAD
   }, [focusPanelByShortcut, fitMapView, setExperimentalUi]);
+=======
+  }, [focusPanelByShortcut, fitMapView, setExperimentalUi, setSettingsOpen, setMapInfoOpen]);
+>>>>>>> experimental-ui-command-palette
 
   /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
   const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
