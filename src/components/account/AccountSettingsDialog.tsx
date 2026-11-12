@@ -32,8 +32,10 @@ import type { ExperimentalUiMode } from '@/lib/experimentalUi';
 
 const EXPERIMENTAL_UI_CHOICES: { value: ExperimentalUiMode; label: string }[] = [
   { value: 'off', label: 'Off' },
-  { value: 'dark', label: 'Dark' },
+  { value: 'aperture', label: 'Aperture (default)' },
+  { value: 'slate', label: 'Experimental slate' },
   { value: 'light', label: 'Light' },
+  { value: 'classic', label: 'Pathfinder classic' },
 ];
 
 /** Trim a minutes value to a compact hours string for an input ("" when null). */

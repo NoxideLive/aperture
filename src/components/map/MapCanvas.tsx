@@ -162,6 +162,7 @@ import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
 import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
+import { ExperimentalThemeToggle } from './ExperimentalThemeToggle';
 import { MapStyleProvider } from './MapStyleContext';
 import { MapLinkHoverProvider } from './MapLinkHoverContext';
 import { homePathConnectionIds } from '@/lib/map/homePath';
@@ -182,7 +183,7 @@ import {
 } from '@/lib/map/layout/panels';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
-import { isExperimentalUiActive } from '@/lib/experimentalUi';
+import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
@@ -583,14 +584,18 @@ export function MapCanvas({
   // current and complete).
   const [experimentalUi, setExperimentalUi] = useExperimentalUi();
   const experimentalActive = isExperimentalUiActive(experimentalUi);
-  const mapStyleOpts = useMemo<MapStyleOptions>(
-    () => ({
-      palette: experimentalActive ? 'experimental' : 'default',
-      theme: experimentalUi === 'light' ? 'light' : 'dark',
-      importanceLinks: experimentalActive,
-    }),
-    [experimentalActive, experimentalUi],
-  );
+  const mapStyleOpts = useMemo<MapStyleOptions>(() => {
+    if (!experimentalActive) {
+      return { palette: 'default', theme: 'dark' };
+    }
+    const variant = experimentalMapStyleVariant(experimentalUi);
+    return {
+      palette: variant === 'aperture' ? 'default' : 'experimental',
+      theme: variant === 'light' ? 'light' : 'dark',
+      importanceLinks: true,
+      variant,
+    };
+  }, [experimentalActive, experimentalUi]);
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
     const experimentalOnLoad = isExperimentalUiActive(initialExperimentalUi);
     const base =
@@ -2176,14 +2181,24 @@ export function MapCanvas({
         run: () => commandHandlersRef.current.setExperimentalUi('off'),
       },
       {
-        id: 'exp-dark',
-        label: 'Experimental UI: Dark',
-        run: () => commandHandlersRef.current.setExperimentalUi('dark'),
+        id: 'exp-aperture',
+        label: 'Theme: Aperture (default)',
+        run: () => commandHandlersRef.current.setExperimentalUi('aperture'),
+      },
+      {
+        id: 'exp-slate',
+        label: 'Theme: Experimental slate',
+        run: () => commandHandlersRef.current.setExperimentalUi('slate'),
       },
       {
         id: 'exp-light',
-        label: 'Experimental UI: Light',
+        label: 'Theme: Light',
         run: () => commandHandlersRef.current.setExperimentalUi('light'),
+      },
+      {
+        id: 'exp-classic',
+        label: 'Theme: Pathfinder classic',
+        run: () => commandHandlersRef.current.setExperimentalUi('classic'),
       },
     ];
     for (const [idx, panel] of COMMAND_PANEL_FOCUS_ORDER.entries()) {
@@ -2516,6 +2531,7 @@ export function MapCanvas({
                     <MapShareIndicator shares={liveShares} />
                   </div>
                   <div className="ap-map-toolbar flex shrink-0 items-center gap-1">
+                    {experimentalActive ? <ExperimentalThemeToggle /> : null}
                     <ActiveCharSelector />
                     <PilotRosterButton viewData={viewData} />
                     {soundsOn && <SoundToolbarButton />}

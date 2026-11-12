@@ -9,8 +9,10 @@ import {
 
 describe('parseApUiCookie', () => {
   it.each([
-    ['exp-dark', 'dark'],
+    ['exp-dark', 'aperture'],
+    ['exp-slate', 'slate'],
     ['exp-light', 'light'],
+    ['exp-classic', 'classic'],
   ] as const)('maps %s to %s', (raw, mode) => {
     expect(parseApUiCookie(raw)).toBe(mode);
   });
@@ -22,8 +24,10 @@ describe('parseApUiCookie', () => {
 
 describe('experimentalUiModeToCookieValue', () => {
   it.each([
-    ['dark', 'exp-dark'],
+    ['aperture', 'exp-dark'],
+    ['slate', 'exp-slate'],
     ['light', 'exp-light'],
+    ['classic', 'exp-classic'],
     ['off', null],
   ] as const)('maps %s to %j', (mode, cookie) => {
     expect(experimentalUiModeToCookieValue(mode)).toBe(cookie);
@@ -35,14 +39,21 @@ describe('experimentalUiHtmlAttributes', () => {
     expect(experimentalUiHtmlAttributes('off')).toEqual({});
   });
 
-  it('sets data-ui and data-theme when active', () => {
-    expect(experimentalUiHtmlAttributes('dark')).toEqual({
+  it('sets data-ui, data-theme, and data-variant when active', () => {
+    expect(experimentalUiHtmlAttributes('aperture')).toEqual({
       'data-ui': 'experimental',
       'data-theme': 'dark',
+      'data-variant': 'aperture',
+    });
+    expect(experimentalUiHtmlAttributes('slate')).toEqual({
+      'data-ui': 'experimental',
+      'data-theme': 'dark',
+      'data-variant': 'slate',
     });
     expect(experimentalUiHtmlAttributes('light')).toEqual({
       'data-ui': 'experimental',
       'data-theme': 'light',
+      'data-variant': 'light',
     });
   });
 });
