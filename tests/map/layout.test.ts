@@ -6,6 +6,7 @@ import {
 } from '@/lib/map/layout/experimentalCollapse';
 import {
   DEFAULT_MAP_LAYOUT,
+  LAYOUT_CONFIG_VERSION,
   PANELS,
   dedupeGroups,
   ensurePanelsPlaced,
@@ -34,7 +35,7 @@ function v1Layout(): StoredMapLayout {
 describe('migrateLayout', () => {
   it('derives one singleton group per layout item from a v1 blob', () => {
     const migrated = migrateLayout(v1Layout());
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(LAYOUT_CONFIG_VERSION);
     expect(migrated.groups.lg).toEqual([
       { id: 'canvas', members: ['canvas'], active: 'canvas' },
       { id: 'signatures', members: ['signatures'], active: 'signatures' },
@@ -51,10 +52,10 @@ describe('migrateLayout', () => {
     }
   });
 
-  it('returns an already-grouped (v2) config unchanged', () => {
+  it('returns an already-grouped config unchanged', () => {
     const migrated = migrateLayout(DEFAULT_MAP_LAYOUT);
     expect(migrated.groups).toEqual(DEFAULT_MAP_LAYOUT.groups);
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(LAYOUT_CONFIG_VERSION);
   });
 });
 
@@ -89,7 +90,7 @@ describe('ensurePanelsPlaced', () => {
   });
 
   it('is referentially stable when nothing is missing', () => {
-    const complete = migrateLayout(DEFAULT_MAP_LAYOUT);
+    const complete = ensurePanelsPlaced(migrateLayout(DEFAULT_MAP_LAYOUT));
     expect(ensurePanelsPlaced(complete)).toBe(complete);
   });
 
