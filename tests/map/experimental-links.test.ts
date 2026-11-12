@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionStyle } from '@/components/map/styling';
+import { connectionStyle, experimentalEolOutlineClass } from '@/components/map/styling';
 import { homePathConnectionIds } from '@/lib/map/homePath';
 
 describe('connectionStyle importance', () => {
@@ -23,6 +23,15 @@ describe('connectionStyle importance', () => {
     );
     expect(sg.strokeDasharray).toBe('2 5');
     expect(sg.strokeOpacity).toBeLessThan(0.5);
+  });
+});
+
+describe('experimentalEolOutlineClass', () => {
+  it('distinguishes eol vs critical and skips expired', () => {
+    expect(experimentalEolOutlineClass('eol')).toContain('ap-connection-eol-stage-eol');
+    expect(experimentalEolOutlineClass('critical')).toContain('ap-connection-eol-stage-critical');
+    expect(experimentalEolOutlineClass('expired')).toBeNull();
+    expect(experimentalEolOutlineClass('none')).toBeNull();
   });
 });
 

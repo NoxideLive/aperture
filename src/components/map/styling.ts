@@ -306,6 +306,15 @@ function importanceWhFresh(opts: MapStyleOptions | undefined) {
   return theme === 'light' ? IMPORTANCE_WH_FRESH_LIGHT : IMPORTANCE_WH_FRESH_DARK;
 }
 
+/** Experimental-only purple outline classes by `eolStage` (mass stays on the base path). */
+export function experimentalEolOutlineClass(
+  eolStage: MapConnectionEdge['eolStage'],
+): string | null {
+  if (eolStage === 'eol') return 'ap-connection-eol-outline ap-connection-eol-stage-eol';
+  if (eolStage === 'critical') return 'ap-connection-eol-outline ap-connection-eol-stage-critical';
+  return null;
+}
+
 function connectionImportanceStyle(
   edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
   opts?: MapStyleOptions,
