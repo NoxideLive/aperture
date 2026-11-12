@@ -34,7 +34,7 @@ All features below require the experimental UI (`ap_ui` cookie). Legacy UI is un
 - **Signature clean up** dialog (toolbar + signatures panel header + palette): chain or selected-system scope, filter preview, preferences saved in layout `panelSettings.signatures`.
 - Layout presets (**Scanning**, **Combat**, **Travel**) in the toolbar Panels menu; `layoutPreset` stored in saved layout.
 - Panel merge targets pulse while dragging tabs; larger tab drag ghost and tear-off drop zone label.
-- Per-panel undo stacks and **Ctrl+Z / Ctrl+Shift+Z** on the focused panel (in-memory).
+- Per-panel undo stacks and **Ctrl+Z / Ctrl+Shift+Z** on the focused panel; map system edits push undo steps; label history persists in `localStorage` (full redo across reload not yet serialized).
 - Account settings (experimental): **Device** scope badges and search filter on experimental sections.
 
 ## Routes (BUILD 2 data)
