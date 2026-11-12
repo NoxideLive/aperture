@@ -6,7 +6,7 @@ import type { MapConnectionEdge } from '@/lib/map/loadMap';
 import type { ConnectionEnd } from '@/types';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Eye, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
-import { connectionBadges, connectionStyle } from './styling';
+import { connectionBadges, connectionStyle, experimentalEolOutlineClass } from './styling';
 import { useMapStyleOptions } from './MapStyleContext';
 import { useTravelForConnection } from './MapTravelContext';
 import { useIsConnectionWatched } from '@/lib/connectionWatchPrefs';
@@ -151,11 +151,11 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
           }
         }}
       >
-        {importance && data.eolStage !== 'none' ? (
+        {importance && experimentalEolOutlineClass(data.eolStage) ? (
           <path
             d={path}
             fill="none"
-            className="ap-connection-eol-outline pointer-events-none"
+            className={`${experimentalEolOutlineClass(data.eolStage)} pointer-events-none`}
             vectorEffect="non-scaling-stroke"
           />
         ) : null}

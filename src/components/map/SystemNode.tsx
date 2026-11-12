@@ -38,6 +38,7 @@ import { homeAccentColor, systemClassColor, systemEffectColor, systemStatusColor
 import { useMapStyleOptions } from './MapStyleContext';
 import { InlineTextEdit } from './InlineTextEdit';
 import { StaticDetailPopover } from './StaticDetailPopover';
+import { useExperimentalHoverTriggerDelays } from '@/lib/experimentalHoverDelay.client';
 import { SystemPresenceTable } from './SystemPresenceTable';
 import { usePresenceForSystem } from './MapPresenceContext';
 import { useSignatureIndicator } from './MapSignatureIndicatorContext';
@@ -45,6 +46,7 @@ import { useUnderglowForSystem } from './MapUnderglowContext';
 import { SystemUnderglow } from './SystemUnderglow';
 import { RALLY_UNDERGLOW } from './underglowPresets';
 import { useIsLinkEndpointLit, useIsLinkHoverDimActive } from './MapLinkHoverContext';
+import { useExperimentalCombatRingActive } from './ExperimentalCombatRingContext';
 import React from 'react';
 
 // System tile. Status stripe + security badge + tag + alias/name + presence
@@ -94,6 +96,8 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
   const linkDimActive = useIsLinkHoverDimActive();
   const endpointLit = styleOpts.importanceLinks === true && endpointLitActive;
   const linkDim = styleOpts.importanceLinks === true && linkDimActive;
+  const experimentalUi = isExperimentalUiActive(readExperimentalUiFromHtml());
+  const combatRing = useExperimentalCombatRingActive(data.id);
 
   // Compose the box-shadow as concentric rings: the resting ring is the system's
   // status colour (replacing the old neutral Tailwind `ring-1`), with the Home
@@ -159,6 +163,9 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
       {/* Persistent rally underglow, derived straight from map state so it lives
           exactly as long as `rallyAt` is set. Kept separate from the transient
           store glow below so a coinciding killmail/ping can't clear it. */}
+      {experimentalUi && combatRing ? (
+        <div className="ap-combat-ring pointer-events-none absolute inset-0 rounded-md" aria-hidden />
+      ) : null}
       {data.rallyAt && <SystemUnderglow {...RALLY_UNDERGLOW} />}
       {glow && <SystemUnderglow key={glow.token} {...glow.config} />}
       {pilots.length > 0 && <PresenceBadge pilots={pilots} />}
@@ -479,6 +486,7 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
   const color = systemEffectColor(effect);
   const name = systemEffectName(effect);
   const bonuses = classId != null ? systemEffectBonuses(effect, classId) : [];
+  const hoverDelays = useExperimentalHoverTriggerDelays();
 
   return (
     <PreviewCard.Root>
@@ -487,6 +495,7 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
         className="nodrag nopan ml-auto size-2.5 shrink-0 rounded-xs ring-1 ring-foreground/25"
         style={{ backgroundColor: color }}
         aria-label={`System effect: ${name}`}
+        {...hoverDelays}
       />
       <PreviewCard.Portal>
         <PreviewCard.Positioner sideOffset={4} side="bottom" align="end">
@@ -528,6 +537,7 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
  */
 function PresenceBadge({ pilots }: { pilots: readonly MapPresenceEntry[] }) {
   const experimental = isExperimentalUiActive(readExperimentalUiFromHtml());
+  const hoverDelays = useExperimentalHoverTriggerDelays();
   const standing = pilotCountStandingTone(pilots.length);
   const [delta, setDelta] = useState<'up' | 'down' | null>(null);
   const prevCount = useRef(pilots.length);
@@ -551,8 +561,7 @@ function PresenceBadge({ pilots }: { pilots: readonly MapPresenceEntry[] }) {
           // Render as a button so it's keyboard-focusable; default `<a>` would
           // suggest a navigation.
           render={<button type="button" />}
-          delay={experimental ? 0 : undefined}
-          closeDelay={experimental ? 100 : undefined}
+          {...(experimental ? hoverDelays : {})}
           className={cn(
             'nodrag nopan pointer-events-auto inline-flex items-center gap-0.5 rounded-full bg-card px-2 py-1 text-sm font-semibold leading-none shadow-sm ring-1',
             experimental

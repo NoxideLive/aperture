@@ -32,6 +32,9 @@ Returns the amber/gold accent (`#fbbf24`) used to mark the map's designated Home
 ### noteSeverityColor(severity: NoteSeverity): string
 Border colour for a map note (`MapNoteNode`), by `map_note_severity`: `neutral`→grey `#6b7280` (the file's default, so an unflagged note reads as "no severity"), `green`→`#22c55e`, `yellow`→`#eab308`, `red`→`#ef4444`.
 
+### experimentalEolOutlineClass(eolStage): string | null
+When `importanceLinks` is on, returns CSS classes for the supplemental purple outline path on `ConnectionEdge` for `eol` (~4h, static) or `critical` (~1h, slow pulse); `none` and `expired` return null (expired keeps line/badge behaviour only).
+
 ### connectionStyle(edge: Pick&lt;MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'&gt;): EdgeStyle
 Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `expired` sparsest (`1 4`, barely-there), `critical` (1h) tighter (`2 3`) than `eol` (4h, `6 4`) — to read as progressively more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
 
