@@ -14,6 +14,7 @@ import { ConnectionDetailPopover } from './ConnectionDetailPopover';
 import { useEdgeAnchors } from './useEdgeAnchors';
 import { ConnectionBubble } from './ConnectionBubble';
 import { ConnectionEndpoint, type ConnectionEndpointState } from './ConnectionEndpoint';
+import { useMapLinkHover, useSetMapLinkHover } from './MapLinkHoverContext';
 
 // Selectable connection edge. Scope + mass status drive the stroke colour; EOL
 // dashes the line; flags (jump-mass / EOL / frigate / rolling / preserve) render
@@ -46,6 +47,8 @@ export type ConnectionEdgeData = MapConnectionEdge & {
   wormholeCode: string | null;
   /** Right-click on one mouth of this connection; opens the endpoint context menu. */
   onEndpointContextMenu: (connectionId: string, end: ConnectionEnd, clientX: number, clientY: number) => void;
+  /** BFS tree from Home (experimental link salience). */
+  isOnHomePath?: boolean;
 };
 
 export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) {
@@ -95,12 +98,32 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
   const [hoveredEnd, setHoveredEnd] = useState<ConnectionEnd | null>(null);
 
   const styleOpts = useMapStyleOptions();
+  const importance = styleOpts.importanceLinks === true;
   const style = connectionStyle(data, styleOpts);
-  const lineWeight = selected ? 2 : hovered && hoveredEnd === null ? 1.5 : 0;
-  const finalStyle = lineWeight
-    ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + lineWeight }
-    : style;
-  const badges = connectionBadges(data);
+  const linkHover = useMapLinkHover();
+  const setLinkHover = useSetMapLinkHover();
+  const isLit = importance && linkHover.edgeId === props.id;
+  const lineWeight = selected
+    ? 2
+    : hovered && hoveredEnd === null
+      ? importance
+        ? 2.5
+        : 1.5
+      : 0;
+  let finalStyle = lineWeight
+    ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + lineWeight, strokeOpacity: 1 }
+    : { ...style };
+  if (importance && isLit) {
+    finalStyle = {
+      ...finalStyle,
+      strokeWidth: (finalStyle.strokeWidth ?? 2) + 2,
+      strokeOpacity: 1,
+    };
+  } else if (importance && data.isOnHomePath) {
+    const base = finalStyle.strokeOpacity ?? 1;
+    finalStyle = { ...finalStyle, strokeOpacity: Math.min(1, base * 1.28) };
+  }
+  const badges = connectionBadges(data, styleOpts);
   const watched = useIsConnectionWatched(data.mapId, props.id);
   const hasLabel = badges.length > 0 || data.isRolling || data.preserveMass || watched;
   const travel = useTravelForConnection(props.id);
@@ -114,12 +137,28 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
   return (
     <>
       <g
-        onMouseEnter={() => setHovered(true)}
+        onMouseEnter={() => {
+          setHovered(true);
+          if (importance) {
+            setLinkHover({ edgeId: props.id, sourceId: source, targetId: target });
+          }
+        }}
         onMouseLeave={() => {
           setHovered(false);
           setHoveredEnd(null);
+          if (importance) {
+            setLinkHover({ edgeId: null, sourceId: null, targetId: null });
+          }
         }}
       >
+        {importance && data.eolStage !== 'none' ? (
+          <path
+            d={path}
+            fill="none"
+            className="ap-connection-eol-outline pointer-events-none"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
         {data.sourceBubbled && (
           <ConnectionBubble
             gradientId={`bubble-${props.id}-source`}

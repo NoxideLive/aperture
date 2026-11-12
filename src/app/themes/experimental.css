@@ -100,3 +100,49 @@
 [data-ui="experimental"] [data-slot="dialog-content"] {
   gap: 1rem;
 }
+
+/* Map link salience — experimental importance-ordered connections */
+[data-ui='experimental'] .ap-connection-eol-outline {
+  stroke: #a855f7;
+  stroke-width: 5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: ap-eol-outline-pulse 2.8s ease-in-out infinite;
+}
+
+[data-ui='experimental'][data-theme='light'] .ap-connection-eol-outline {
+  stroke: #7e22ce;
+}
+
+[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-outline {
+  stroke: #d747d6;
+  stroke-width: 6px;
+}
+
+@keyframes ap-eol-outline-pulse {
+  0%,
+  100% {
+    stroke-opacity: 0.5;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui='experimental'] .ap-connection-eol-outline {
+    animation: none;
+    stroke-opacity: 0.88;
+  }
+}
+
+[data-ui='experimental'] .react-flow__node.ap-link-hover-dimmed {
+  opacity: 0.52;
+  filter: saturate(0.72);
+}
+
+[data-ui='experimental'] .react-flow__node.ap-link-endpoint-lit {
+  filter: brightness(1.12);
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}

@@ -162,6 +162,8 @@ import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
 import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
 import { MapStyleProvider } from './MapStyleContext';
+import { MapLinkHoverProvider, useIsLinkHoverDimActive } from './MapLinkHoverContext';
+import { homePathConnectionIds } from '@/lib/map/homePath';
 import type { MapStyleOptions } from './styling';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
@@ -584,6 +586,7 @@ export function MapCanvas({
     () => ({
       palette: experimentalActive ? 'experimental' : 'default',
       theme: experimentalUi === 'light' ? 'light' : 'dark',
+      importanceLinks: experimentalActive,
     }),
     [experimentalActive, experimentalUi],
   );
@@ -1980,6 +1983,11 @@ export function MapCanvas({
     });
   }
 
+  const homePathEdges = useMemo(
+    () => homePathConnectionIds(viewData.map.homeMapSystemId, viewData.connections),
+    [viewData.map.homeMapSystemId, viewData.connections],
+  );
+
   const edges = useMemo<Edge<ConnectionEdgeData>[]>(() => {
     // Resolve each connection's source wormhole from its attached signatures,
     // preferring the named side over the K162 reverse-exit (the named hole is the
@@ -2007,11 +2015,19 @@ export function MapCanvas({
           wormholeTypeId: wh?.typeId ?? null,
           wormholeCode: wh?.code ?? null,
           onEndpointContextMenu,
+          isOnHomePath: homePathEdges.has(c.id),
         },
         selected: selected?.kind === 'connection' && selected.id === c.id,
       };
     });
-  }, [viewData.connections, viewData.signatures, viewData.map.id, selected, onEndpointContextMenu]);
+  }, [
+    viewData.connections,
+    viewData.signatures,
+    viewData.map.id,
+    selected,
+    onEndpointContextMenu,
+    homePathEdges,
+  ]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
     if (selected?.kind !== 'system') return null;
@@ -2439,6 +2455,7 @@ export function MapCanvas({
 
   return (
     <MapStyleProvider value={mapStyleOpts}>
+    <MapLinkHoverProvider>
     <MapPresenceProvider initial={data.presence} mapId={data.map.id}>
       <MapActiveCharProvider viewerCharacters={viewerCharacters} mainCharacterId={mainCharacterId}>
         <MapTravelProvider>
@@ -2644,6 +2661,7 @@ export function MapCanvas({
         </MapTravelProvider>
       </MapActiveCharProvider>
     </MapPresenceProvider>
+    </MapLinkHoverProvider>
     </MapStyleProvider>
   );
 }

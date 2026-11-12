@@ -9,13 +9,26 @@ import { roundSecurity } from '@/lib/sde/security';
 
 export type MapStylePalette = 'default' | 'experimental';
 
+export type MapStyleVariant = 'aperture' | 'slate' | 'light' | 'classic';
+
 export type MapStyleOptions = {
   palette?: MapStylePalette;
   theme?: 'dark' | 'light';
+  /** Experimental map link salience (importance-ordered strokes). */
+  importanceLinks?: boolean;
+  variant?: MapStyleVariant;
 };
 
-function resolved(opts?: MapStyleOptions): Required<MapStyleOptions> {
-  return { palette: opts?.palette ?? 'default', theme: opts?.theme ?? 'dark' };
+function resolved(opts?: MapStyleOptions): Required<Omit<MapStyleOptions, 'variant' | 'importanceLinks'>> & {
+  importanceLinks: boolean;
+  variant: MapStyleVariant;
+} {
+  return {
+    palette: opts?.palette ?? 'default',
+    theme: opts?.theme ?? 'dark',
+    importanceLinks: opts?.importanceLinks ?? false,
+    variant: opts?.variant ?? 'aperture',
+  };
 }
 
 // Covers universe_system.security labels: H, L, 0.0, C1–C6, P (Pochven), A (Abyssal).
@@ -271,7 +284,84 @@ export type EdgeStyle = {
   stroke: string;
   strokeWidth: number;
   strokeDasharray?: string;
+  strokeOpacity?: number;
 };
+
+const IMPORTANCE_WH_FRESH_DARK = { stroke: '#6b7280', width: 1.5, opacity: 0.32 };
+const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.42 };
+const IMPORTANCE_WH_REDUCED_DARK = { stroke: '#f59e0b', width: 2.5, opacity: 0.95 };
+const IMPORTANCE_WH_REDUCED_LIGHT = { stroke: '#b45309', width: 2.5, opacity: 1 };
+const IMPORTANCE_WH_CRITICAL_DARK = { stroke: '#ef4444', width: 4, opacity: 1 };
+const IMPORTANCE_WH_CRITICAL_LIGHT = { stroke: '#b91c1c', width: 4, opacity: 1 };
+const IMPORTANCE_STARGATE_DARK = { stroke: '#64748b', width: 1.5, opacity: 0.35, dash: '2 5' as const };
+const IMPORTANCE_STARGATE_LIGHT = { stroke: '#475569', width: 1.5, opacity: 0.4, dash: '2 5' as const };
+const IMPORTANCE_CLASSIC_WH_FRESH = { stroke: '#3c3f41', width: 2, opacity: 0.85 };
+const IMPORTANCE_CLASSIC_REDUCED = { stroke: '#e28a0d', width: 2.5, opacity: 1 };
+const IMPORTANCE_CLASSIC_CRITICAL = { stroke: '#a52521', width: 4, opacity: 1 };
+const IMPORTANCE_CLASSIC_STARGATE = { stroke: '#63676a', width: 2, opacity: 0.5, dash: '2 6' as const };
+
+function importanceWhFresh(opts: MapStyleOptions | undefined) {
+  const { theme, variant } = resolved(opts);
+  if (variant === 'classic') return IMPORTANCE_CLASSIC_WH_FRESH;
+  return theme === 'light' ? IMPORTANCE_WH_FRESH_LIGHT : IMPORTANCE_WH_FRESH_DARK;
+}
+
+function connectionImportanceStyle(
+  edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
+  opts?: MapStyleOptions,
+): EdgeStyle {
+  const { variant } = resolved(opts);
+  if (edge.scope === 'stargate') {
+    const g = variant === 'classic' ? IMPORTANCE_CLASSIC_STARGATE : resolved(opts).theme === 'light'
+      ? IMPORTANCE_STARGATE_LIGHT
+      : IMPORTANCE_STARGATE_DARK;
+    return {
+      stroke: g.stroke,
+      strokeWidth: g.width,
+      strokeOpacity: g.opacity,
+      strokeDasharray: g.dash,
+    };
+  }
+  if (edge.scope !== 'wh') {
+    const stroke = variant === 'classic' ? '#63676a' : '#94a3b8';
+    return { stroke, strokeWidth: 2, strokeOpacity: 0.45 };
+  }
+
+  const mass =
+    edge.massStatus === 'critical'
+      ? variant === 'classic'
+        ? IMPORTANCE_CLASSIC_CRITICAL
+        : resolved(opts).theme === 'light'
+          ? IMPORTANCE_WH_CRITICAL_LIGHT
+          : IMPORTANCE_WH_CRITICAL_DARK
+      : edge.massStatus === 'reduced'
+        ? variant === 'classic'
+          ? IMPORTANCE_CLASSIC_REDUCED
+          : resolved(opts).theme === 'light'
+            ? IMPORTANCE_WH_REDUCED_LIGHT
+            : IMPORTANCE_WH_REDUCED_DARK
+        : importanceWhFresh(opts);
+
+  let dash: string | undefined;
+  const size = edge.jumpMassClass;
+  if (size === 's') dash = '3 4';
+  else if (size === 'm') dash = '6 4';
+  else if (size === 'xl') {
+    return {
+      stroke: mass.stroke,
+      strokeWidth: (mass.width ?? 2) + 2,
+      strokeOpacity: mass.opacity,
+      strokeDasharray: undefined,
+    };
+  }
+
+  return {
+    stroke: mass.stroke,
+    strokeWidth: mass.width,
+    strokeOpacity: mass.opacity,
+    strokeDasharray: dash,
+  };
+}
 
 /**
  * Stroke styling for a connection. Scope picks the base colour; wormholes are
@@ -284,7 +374,10 @@ export function connectionStyle(
   edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
   opts?: MapStyleOptions,
 ): EdgeStyle {
-  const { palette, theme } = resolved(opts);
+  const { palette, theme, importanceLinks } = resolved(opts);
+  if (importanceLinks) {
+    return connectionImportanceStyle(edge, opts);
+  }
   const mass =
     palette === 'default'
       ? DEFAULT_MASS_COLORS
@@ -332,13 +425,17 @@ export type ConnectionBadge = {
  */
 export function connectionBadges(
   edge: Pick<MapConnectionEdge, 'isStatic' | 'jumpMassClass' | 'eolStage'>,
+  opts?: MapStyleOptions,
 ): ConnectionBadge[] {
   const badges: ConnectionBadge[] = [];
   if (edge.isStatic) badges.push({ key: 'static', label: 'STATIC' });
-  if (edge.jumpMassClass) {
+  const importance = resolved(opts).importanceLinks;
+  const showSize =
+    edge.jumpMassClass && (!importance || edge.jumpMassClass !== 'l');
+  if (showSize) {
     badges.push({
       key: 'size',
-      label: edge.jumpMassClass.toUpperCase(),
+      label: edge.jumpMassClass!.toUpperCase(),
       tone: edge.jumpMassClass === 's' ? 'warn' : undefined,
     });
   }

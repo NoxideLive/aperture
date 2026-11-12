@@ -35,6 +35,7 @@ import { useSignatureIndicator } from './MapSignatureIndicatorContext';
 import { useUnderglowForSystem } from './MapUnderglowContext';
 import { SystemUnderglow } from './SystemUnderglow';
 import { RALLY_UNDERGLOW } from './underglowPresets';
+import { useIsLinkEndpointLit, useIsLinkHoverDimActive } from './MapLinkHoverContext';
 import React from 'react';
 
 // System tile. Status stripe + security badge + tag + alias/name + presence
@@ -80,6 +81,10 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
   const displayName = systemDisplayName(data.systemId, data.name);
   const isDrifter = isDrifterSystem(data.systemId);
   const isShattered = isShatteredSystem(data.name);
+  const endpointLitActive = useIsLinkEndpointLit(data.id);
+  const linkDimActive = useIsLinkHoverDimActive();
+  const endpointLit = styleOpts.importanceLinks === true && endpointLitActive;
+  const linkDim = styleOpts.importanceLinks === true && linkDimActive;
 
   // Compose the box-shadow as concentric rings: the resting ring is the system's
   // status colour (replacing the old neutral Tailwind `ring-1`), with the Home
@@ -123,7 +128,13 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
 
   return (
     <div
-      className="group relative min-w-30 cursor-pointer rounded-md bg-map-node text-xs text-card-foreground transition-[box-shadow,outline,transform] duration-50"
+      className={[
+        'group relative min-w-30 cursor-pointer rounded-md bg-map-node text-xs text-card-foreground transition-[box-shadow,outline,transform,opacity,filter] duration-50',
+        endpointLit ? 'ap-link-endpoint-lit' : '',
+        linkDim && !endpointLit ? 'ap-link-hover-dimmed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{
         borderLeft: `4px solid ${classColor}`,
         // Selected tiles get a prominent halo in their status colour: a solid
