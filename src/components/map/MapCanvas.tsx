@@ -184,6 +184,7 @@ import {
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
+import { readKeepMapSelection } from '@/lib/experimentalQolPrefs';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
@@ -368,6 +369,7 @@ export function MapCanvas({
   initialExperimentalUi: import('@/lib/experimentalUi').ExperimentalUiMode;
 }) {
   const [selected, setSelected] = useState<SelectionRef | null>(null);
+  const [lastPrimarySystem, setLastPrimarySystem] = useState<MapSystemNode | null>(null);
   // The multi-select set; `selected` (above) remains the primary anchor that
   // drives the inspector and sidebar modules. Invariant: when
   // `selected?.kind === 'system'`, this set contains `selected.id`. Always
@@ -1463,8 +1465,10 @@ export function MapCanvas({
       }
       setSelected({ kind: 'system', id: node.id });
       setSelectedSystemIds(new Set([node.id]));
+      const sys = viewData.systems.find((s) => s.id === node.id);
+      if (sys) setLastPrimarySystem(sys);
     },
-    [selectedSystemIds],
+    [selectedSystemIds, viewData.systems],
   );
 
   const onEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
@@ -1473,9 +1477,10 @@ export function MapCanvas({
   }, []);
 
   const onPaneClick = useCallback(() => {
+    if (experimentalActive && readKeepMapSelection()) return;
     setSelected(null);
     setSelectedSystemIds(new Set());
-  }, []);
+  }, [experimentalActive]);
 
   // Right-click handlers. Each suppresses the native browser menu and stores the
   // cursor point + target; selection is intentionally left untouched.
@@ -1626,6 +1631,30 @@ export function MapCanvas({
     },
     [mapId, runOptimistic],
   );
+
+  useEffect(() => {
+    if (!experimentalActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (selected?.kind !== 'connection') return;
+      const key = e.key.toLowerCase();
+      if (key === 'f') {
+        e.preventDefault();
+        onConnectionPatch(selected.id, { massStatus: 'fresh' });
+      } else if (key === 'r') {
+        e.preventDefault();
+        onConnectionPatch(selected.id, { massStatus: 'reduced' });
+      } else if (key === 'c') {
+        e.preventDefault();
+        onConnectionPatch(selected.id, { massStatus: 'critical' });
+      } else if (key === 'e' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onConnectionPatch(selected.id, { eolStage: 'eol' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [experimentalActive, selected, onConnectionPatch]);
 
   const onConnectionDelete = useCallback(
     (connectionId: string) => {
@@ -2130,9 +2159,25 @@ export function MapCanvas({
     flowInstance.current?.fitView({ padding: 0.15, duration: 300 });
   }, []);
 
+  const centerOnSelectedSystem = useCallback(() => {
+    const sys = selectedSystem;
+    const inst = flowInstance.current;
+    if (!sys || !inst) return;
+    const node = inst.getNode(sys.id);
+    if (!node) return;
+    const w = node.measured?.width ?? node.width ?? 0;
+    const h = node.measured?.height ?? node.height ?? 0;
+    inst.setCenter(node.position.x + w / 2, node.position.y + h / 2, {
+      zoom: inst.getZoom(),
+      duration: 300,
+    });
+  }, [selectedSystem]);
+
   const commandHandlersRef = useRef({
     focusPanelByShortcut,
     fitMapView,
+    centerOnSelectedSystem,
+    onConnectionPatch,
     setExperimentalUi,
     setSettingsOpen,
     setMapInfoOpen,
@@ -2141,11 +2186,21 @@ export function MapCanvas({
     commandHandlersRef.current = {
       focusPanelByShortcut,
       fitMapView,
+      centerOnSelectedSystem,
+      onConnectionPatch,
       setExperimentalUi,
       setSettingsOpen,
       setMapInfoOpen,
     };
-  }, [focusPanelByShortcut, fitMapView, setExperimentalUi, setSettingsOpen, setMapInfoOpen]);
+  }, [
+    focusPanelByShortcut,
+    fitMapView,
+    centerOnSelectedSystem,
+    onConnectionPatch,
+    setExperimentalUi,
+    setSettingsOpen,
+    setMapInfoOpen,
+  ]);
 
   /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
   const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
@@ -2209,8 +2264,48 @@ export function MapCanvas({
         run: () => commandHandlersRef.current.focusPanelByShortcut(idx as 0 | 1 | 2 | 3),
       });
     }
+  if (experimentalActive) {
+      actions.push({
+        id: 'center-selected',
+        label: 'Jump to selected system (center map)',
+        keywords: 'pan focus navigate',
+        run: () => commandHandlersRef.current.centerOnSelectedSystem(),
+      });
+      if (selected?.kind === 'connection') {
+        const connId = selected.id;
+        actions.push(
+          {
+            id: 'link-mass-fresh',
+            label: 'Selected link: Fresh mass',
+            hint: 'f',
+            run: () =>
+              commandHandlersRef.current.onConnectionPatch(connId, { massStatus: 'fresh' }),
+          },
+          {
+            id: 'link-mass-reduced',
+            label: 'Selected link: Reduced mass',
+            hint: 'r',
+            run: () =>
+              commandHandlersRef.current.onConnectionPatch(connId, { massStatus: 'reduced' }),
+          },
+          {
+            id: 'link-mass-critical',
+            label: 'Selected link: Critical mass',
+            hint: 'c',
+            run: () =>
+              commandHandlersRef.current.onConnectionPatch(connId, { massStatus: 'critical' }),
+          },
+          {
+            id: 'link-eol',
+            label: 'Selected link: Mark EOL',
+            hint: 'e',
+            run: () => commandHandlersRef.current.onConnectionPatch(connId, { eolStage: 'eol' }),
+          },
+        );
+      }
+    }
     return actions;
-  }, []);
+  }, [experimentalActive, selected]);
   /* eslint-enable react-hooks/refs */
 
   useMapCommandPaletteKeyboard({
@@ -2509,6 +2604,7 @@ export function MapCanvas({
               <SignaturePasteHotkey
                 mapId={mapId}
                 selectedSystem={selectedSystem}
+                fallbackSystem={lastPrimarySystem}
                 systems={viewData.systems}
                 viewerCharacterIds={viewerCharacterIds}
                 onBulkPaste={onSignaturePasteResult}

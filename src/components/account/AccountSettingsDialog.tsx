@@ -37,6 +37,14 @@ import {
 } from '@/lib/experimentalHoverDelay';
 import { useExperimentalHoverDelayContext } from '@/lib/experimentalHoverDelay.client';
 import { isExperimentalUiActive } from '@/lib/experimentalUi';
+import {
+  readExperimentalPointerCursor,
+  readKeepMapSelection,
+  readPastePreviewOnCtrlV,
+  writeExperimentalPointerCursor,
+  writeKeepMapSelection,
+  writePastePreviewOnCtrlV,
+} from '@/lib/experimentalQolPrefs';
 
 const EXPERIMENTAL_UI_CHOICES: { value: ExperimentalUiMode; label: string }[] = [
   { value: 'off', label: 'Off' },
@@ -95,6 +103,9 @@ export function AccountSettingsDialog({
   const { delayMs: hoverDelayMs, setDelayMs: setHoverDelayMs } = useExperimentalHoverDelayContext();
   const [hoverDelayInput, setHoverDelayInput] = useState(String(hoverDelayMs));
   const experimentalOn = isExperimentalUiActive(experimentalUi);
+  const [keepSelection, setKeepSelection] = useState(readKeepMapSelection);
+  const [pointerCursor, setPointerCursor] = useState(readExperimentalPointerCursor);
+  const [pastePreview, setPastePreview] = useState(readPastePreviewOnCtrlV);
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -347,6 +358,46 @@ export function AccountSettingsDialog({
                     setHoverDelayMs(next);
                   }}
                 />
+              </div>
+            ) : null}
+            {experimentalOn ? (
+              <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={keepSelection}
+                    onChange={(e) => {
+                      setKeepSelection(e.target.checked);
+                      writeKeepMapSelection(e.target.checked);
+                    }}
+                  />
+                  Keep selection when clicking empty map
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={pointerCursor}
+                    onChange={(e) => {
+                      setPointerCursor(e.target.checked);
+                      writeExperimentalPointerCursor(e.target.checked);
+                    }}
+                  />
+                  Pointer cursor on buttons
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={pastePreview}
+                    onChange={(e) => {
+                      setPastePreview(e.target.checked);
+                      writePastePreviewOnCtrlV(e.target.checked);
+                    }}
+                  />
+                  Preview signature paste (coming: opens diff dialog)
+                </label>
               </div>
             ) : null}
           </fieldset>

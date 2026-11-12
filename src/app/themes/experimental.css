@@ -151,3 +151,8 @@
   border-color: #38bdf8;
   box-shadow: 0 0 0 1px color-mix(in srgb, #38bdf8 35%, transparent);
 }
+
+[data-ui='experimental'][data-pointer-cursor='on'] button:not(:disabled),
+[data-ui='experimental'][data-pointer-cursor='on'] [role='button']:not(:disabled) {
+  cursor: pointer;
+}

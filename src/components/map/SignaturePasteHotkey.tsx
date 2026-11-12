@@ -33,6 +33,8 @@ import type { MapEventPayload, MapSystemNode, ParsedSigRow } from '@/types';
 export function SignaturePasteHotkey({
   mapId,
   selectedSystem,
+  /** Experimental: last primary system when pane click preserved selection. */
+  fallbackSystem,
   systems,
   viewerCharacterIds,
   onBulkPaste,
@@ -42,6 +44,7 @@ export function SignaturePasteHotkey({
 }: {
   mapId: string;
   selectedSystem: MapSystemNode | null;
+  fallbackSystem?: MapSystemNode | null;
   systems: MapSystemNode[];
   viewerCharacterIds: number[];
   onBulkPaste: (payloads: MapEventPayload[]) => void;
@@ -72,6 +75,7 @@ export function SignaturePasteHotkey({
   const latest = useRef({
     mapId,
     selectedSystem,
+    fallbackSystem: fallbackSystem ?? null,
     systems,
     viewerCharacterIds,
     store,
@@ -84,6 +88,7 @@ export function SignaturePasteHotkey({
     latest.current = {
       mapId,
       selectedSystem,
+      fallbackSystem: fallbackSystem ?? null,
       systems,
       viewerCharacterIds,
       store,
@@ -122,8 +127,9 @@ export function SignaturePasteHotkey({
       if (rows.length === 0) return; // not scanner data — don't hijack the paste
       e.preventDefault();
 
-      const { selectedSystem, systems, viewerCharacterIds, store } = latest.current;
-      if (!selectedSystem) {
+      const { selectedSystem, fallbackSystem, systems, viewerCharacterIds, store } = latest.current;
+      const targetSystem = selectedSystem ?? fallbackSystem;
+      if (!targetSystem) {
         toast.info('Select a system on the map to paste scanned signatures into it.');
         return;
       }
@@ -134,8 +140,8 @@ export function SignaturePasteHotkey({
         .map((id) => store?.getSystemForCharacter(id) ?? null)
         .filter((s): s is number => s !== null);
 
-      if (myLocations.includes(selectedSystem.systemId)) {
-        apply(rows, selectedSystem); // a pilot is in the selected system — fast path
+      if (myLocations.includes(targetSystem.systemId)) {
+        apply(rows, targetSystem); // a pilot is in the selected system — fast path
         return;
       }
 
@@ -148,7 +154,7 @@ export function SignaturePasteHotkey({
           : onMap
             ? (onMap.alias ?? onMap.name)
             : 'another system (not on this map)';
-      setConfirm({ rows, targetSystem: selectedSystem, locationName });
+      setConfirm({ rows, targetSystem, locationName });
     }
 
     document.addEventListener('paste', onPaste);
