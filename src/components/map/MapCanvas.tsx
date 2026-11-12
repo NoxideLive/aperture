@@ -159,6 +159,7 @@ import { MapNoteNode, type MapNoteNodeData } from './MapNoteNode';
 import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
+import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
@@ -581,6 +582,35 @@ export function MapCanvas({
   // map open). Subsequent (user-driven) changes save.
   const firstLayoutChange = useRef(true);
   const layoutPersistSkipRef = useRef(false);
+  const experimentalCollapsedHeightsRef = useRef(new Map<string, number>());
+  const [experimentalCollapsedGroups, setExperimentalCollapsedGroups] = useState(
+    () => new Set<string>(),
+  );
+
+  const handleExperimentalPanelCollapse = useCallback(
+    (groupId: string, collapsed: boolean) => {
+      setExperimentalCollapsedGroups((prev) => {
+        const next = new Set(prev);
+        if (collapsed) next.add(groupId);
+        else next.delete(groupId);
+        return next;
+      });
+      setLayout((prev) => {
+        const bp = breakpoint;
+        const items = prev.layouts[bp] ?? [];
+        const updated = applyExperimentalPanelCollapse(
+          items,
+          groupId,
+          collapsed,
+          experimentalCollapsedHeightsRef.current,
+        );
+        if (!updated) return prev;
+        layoutPersistSkipRef.current = true;
+        return { ...prev, layouts: { ...prev.layouts, [bp]: updated } };
+      });
+    },
+    [breakpoint],
+  );
 
   const saveLayout = useCallback((config: MapLayoutConfig) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -625,6 +655,7 @@ export function MapCanvas({
         const layoutId = el.getAttribute('data-layout-item-id');
         const panelId = el.getAttribute('data-panel-id');
         if (!layoutId || panelId === 'canvas') continue;
+        if (experimentalCollapsedGroups.has(layoutId)) continue;
         const measured = el.scrollHeight + 16;
         const minH = PANEL_MIN[panelId as PanelId]?.minH ?? 2;
         const rows = Math.max(minH, Math.ceil(measured / MAP_LAYOUT_ROW_HEIGHT));
@@ -660,7 +691,7 @@ export function MapCanvas({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [experimentalActive, breakpoint]);
+  }, [experimentalActive, breakpoint, experimentalCollapsedGroups]);
 
   // Hide a panel (tab ✕ or panels-menu uncheck). The panel leaves its group's
   // tab strip in every breakpoint (`removePanelFromLayout` re-keys/drops the
@@ -2419,6 +2450,9 @@ export function MapCanvas({
                     onLayoutChange={handleLayoutChange}
                     onBreakpointChange={setBreakpoint}
                     onTearOff={tearOffTab}
+                    experimentalCollapsedGroupIds={
+                      experimentalActive ? experimentalCollapsedGroups : undefined
+                    }
                   >
                     {visibleGroups.map((g) => (
                       <div key={g.id}>
@@ -2427,6 +2461,9 @@ export function MapCanvas({
                           hidden={layout.hidden}
                           onSetActive={handleSetActiveTab}
                           onHideMember={handleHide}
+                          onExperimentalCollapseChange={
+                            experimentalActive ? handleExperimentalPanelCollapse : undefined
+                          }
                           renderContent={panelContent}
                           renderHeaderRight={panelHeaderRight}
                           contentClassName={(id) => {
