@@ -12,6 +12,7 @@
 | onBreakpointChange | (bp: Breakpoint) => void | no | Fired once mounted and whenever the measured width crosses into a new breakpoint |
 | onTearOff | (panel: PanelId, x: number, y: number) => void | no | Fired when a tab is dropped on the open grid surface, with the snapped target cell in grid units |
 | children | ReactNode | yes | One element per visible group, each keyed by its group id |
+| experimentalCollapsedGroupIds | ReadonlySet<string> | no | Group ids collapsed in experimental mode; their `minH` is lowered so header-only row height applies |
 
 ### Renders
 A relative-positioned wrapper `div` holding either the live `Responsive` grid (once measured) or a plain vertical stack of `children` (first paint, before width is known), plus a dashed placement-ghost outline while a tab is dragged over the grid surface.

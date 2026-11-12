@@ -1,4 +1,9 @@
+import type { Layout } from 'react-grid-layout';
 import { describe, expect, it } from 'vitest';
+import {
+  applyExperimentalPanelCollapse,
+  EXPERIMENTAL_COLLAPSED_PANEL_H,
+} from '@/lib/map/layout/experimentalCollapse';
 import {
   DEFAULT_MAP_LAYOUT,
   PANELS,
@@ -294,5 +299,38 @@ describe('mapLayoutConfigSchema', () => {
       },
     };
     expect(mapLayoutConfigSchema.safeParse(config).success).toBe(false);
+  });
+});
+
+describe('applyExperimentalPanelCollapse', () => {
+  const stack: Layout = [
+    { i: 'canvas', x: 0, y: 0, w: 8, h: 12 },
+    { i: 'signatures', x: 0, y: 12, w: 8, h: 10 },
+    { i: 'intel', x: 0, y: 22, w: 8, h: 4 },
+  ];
+
+  it('shrinks height and pulls items below up on collapse', () => {
+    const saved = new Map<string, number>();
+    const next = applyExperimentalPanelCollapse(stack, 'signatures', true, saved)!;
+    const sig = next.find((it) => it.i === 'signatures')!;
+    const intel = next.find((it) => it.i === 'intel')!;
+    expect(sig.h).toBe(EXPERIMENTAL_COLLAPSED_PANEL_H);
+    expect(intel.y).toBe(12 + EXPERIMENTAL_COLLAPSED_PANEL_H);
+    expect(saved.get('signatures')).toBe(10);
+  });
+
+  it('restores saved height and shifts items down on expand', () => {
+    const saved = new Map<string, number>([['signatures', 10]]);
+    const collapsed: Layout = [
+      { i: 'canvas', x: 0, y: 0, w: 8, h: 12 },
+      { i: 'signatures', x: 0, y: 12, w: 8, h: EXPERIMENTAL_COLLAPSED_PANEL_H },
+      { i: 'intel', x: 0, y: 14, w: 8, h: 4 },
+    ];
+    const next = applyExperimentalPanelCollapse(collapsed, 'signatures', false, saved)!;
+    const sig = next.find((it) => it.i === 'signatures')!;
+    const intel = next.find((it) => it.i === 'intel')!;
+    expect(sig.h).toBe(10);
+    expect(intel.y).toBe(22);
+    expect(saved.has('signatures')).toBe(false);
   });
 });
