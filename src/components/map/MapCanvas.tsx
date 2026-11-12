@@ -67,6 +67,7 @@ import {
   fetchMapSnapshot,
   fetchSystemData,
   fetchSystemSignatures,
+  fetchWormholeCatalog,
   pingSystemOnServer,
   removeSystemOnServer,
   updateConnectionOnServer,
@@ -1938,14 +1939,6 @@ export function MapCanvas({
     [experimentalActive, signatureUndoRuntime],
   );
 
-  const onSignatureCreate = useCallback(
-    (body: CreateSignatureBody) => {
-      void onSignatureCreateWithId(body);
-    },
-    // onSignatureCreateWithId defined below
-    [mapId],
-  );
-
   const onSignatureCreateWithId = useCallback(
     async (body: CreateSignatureBody): Promise<string | null> => {
       const result = await createSignatureOnServer({ mapId, body });
@@ -1970,6 +1963,13 @@ export function MapCanvas({
       return created.id;
     },
     [mapId, resync, experimentalActive, pushSignatureUndo],
+  );
+
+  const onSignatureCreate = useCallback(
+    (body: CreateSignatureBody) => {
+      void onSignatureCreateWithId(body);
+    },
+    [onSignatureCreateWithId],
   );
 
   const onSignaturePatch = useCallback(
@@ -2028,20 +2028,78 @@ export function MapCanvas({
   const onSignatureDelete = useCallback(
     (signatureId: string) => {
       const sig = viewData.signatures.find((s) => s.id === signatureId);
+      if (!sig) return;
       runOptimistic({ kind: 'signature.delete', eventId: 0, id: signatureId }, () =>
         deleteSignatureOnServer({ mapId, signatureId }),
       );
+      if (experimentalActive) {
+        pushSignatureUndo(
+          'Delete signature',
+          { kind: 'delete', snapshot: sig },
+          { kind: 'delete', snapshot: sig },
+        );
+      }
       const offer = buildSubchainSigOffer(sig);
       if (offer) setSubchainSigPrompts((q) => [...q, offer]);
     },
-    [mapId, runOptimistic, viewData, buildSubchainSigOffer],
+    [mapId, runOptimistic, viewData, buildSubchainSigOffer, experimentalActive, pushSignatureUndo],
   );
 
   const onBulkSignatureCleanup = useCallback(
     (signatureIds: string[]) => {
-      for (const id of signatureIds) onSignatureDelete(id);
+      const snapshots = signatureIds
+        .map((id) => viewData.signatures.find((s) => s.id === id))
+        .filter((s): s is MapSignature => s != null);
+      for (const id of signatureIds) {
+        const sig = viewData.signatures.find((s) => s.id === id);
+        runOptimistic({ kind: 'signature.delete', eventId: 0, id }, () =>
+          deleteSignatureOnServer({ mapId, signatureId: id }),
+        );
+        const offer = buildSubchainSigOffer(sig);
+        if (offer) setSubchainSigPrompts((q) => [...q, offer]);
+      }
+      if (experimentalActive && snapshots.length > 0) {
+        pushSignatureUndo(
+          'Clean up signatures',
+          { kind: 'bulkDelete', snapshots },
+          { kind: 'bulkDelete', snapshots },
+        );
+      }
     },
-    [onSignatureDelete],
+    [mapId, runOptimistic, viewData.signatures, experimentalActive, pushSignatureUndo, buildSubchainSigOffer],
+  );
+
+  const onSignatureLinkDrop = useCallback(
+    async (connectionId: string, signatureId: string) => {
+      const sig = viewData.signatures.find((s) => s.id === signatureId);
+      if (!sig) return;
+      const conn = viewData.connections.find((c) => c.id === connectionId);
+      if (!conn) return;
+      if (conn.source !== sig.mapSystemId && conn.target !== sig.mapSystemId) {
+        toast.error('That connection is not in this system.');
+        return;
+      }
+      if (
+        sig.mapConnectionId != null &&
+        sig.mapConnectionId !== connectionId &&
+        !viewData.connections.some((c) => c.id === sig.mapConnectionId)
+      ) {
+        const restored = await restoreConnectionOnServer({ mapId, connectionId: sig.mapConnectionId });
+        if (restored.ok) onBulkPaste(restored.data.payloads);
+      }
+      const patch: UpdateSignatureBody = { mapConnectionId: connectionId };
+      if (sig.groupKey !== 'wormhole') patch.groupKey = 'wormhole';
+      onSignaturePatch(signatureId, patch);
+      if (sig.typeId != null) {
+        void fetchWormholeCatalog().then((catalog) => {
+          if (!catalog.ok) return;
+          const row = catalog.data.find((o) => o.typeId === sig.typeId);
+          if (row?.jumpMassClass) onConnectionPatch(connectionId, { jumpMassClass: row.jumpMassClass });
+        });
+      }
+      if (sig.eolStage !== 'none') onConnectionPatch(connectionId, { eolStage: sig.eolStage });
+    },
+    [viewData, mapId, onBulkPaste, onSignaturePatch, onConnectionPatch],
   );
 
   // Scan committed paste payloads for wormhole sigs whose remembered connection
@@ -2080,11 +2138,32 @@ export function MapCanvas({
   // both signature-paste entry points (the CTRL+V hotkey and the panel dialog).
   const onSignaturePasteResult = useCallback(
     (payloads: MapEventPayload[]) => {
+      const systemIds = new Set<string>();
+      for (const p of payloads) {
+        if (p.kind === 'signature.create') {
+          const body = p as MapSignature;
+          if (body.mapSystemId) systemIds.add(body.mapSystemId);
+        } else if (p.kind === 'signature.update' || p.kind === 'signature.delete') {
+          const snap = viewData.signatures.find((s) => s.id === p.id);
+          if (snap) systemIds.add(snap.mapSystemId);
+        }
+      }
+      const beforeSnapshots =
+        systemIds.size > 0
+          ? viewData.signatures.filter((s) => systemIds.has(s.mapSystemId))
+          : [...viewData.signatures];
       const offers = buildRestoreOffers(payloads);
       onBulkPaste(payloads);
+      if (experimentalActive && beforeSnapshots.length > 0) {
+        pushSignatureUndo(
+          'Paste signatures',
+          { kind: 'bulkPaste', beforeSnapshots, forwardPayloads: payloads },
+          { kind: 'bulkPaste', beforeSnapshots: [], forwardPayloads: payloads },
+        );
+      }
       if (offers.length > 0) setRestoreConnPrompts((q) => [...q, ...offers]);
     },
-    [onBulkPaste, buildRestoreOffers],
+    [onBulkPaste, buildRestoreOffers, viewData.signatures, experimentalActive, pushSignatureUndo],
   );
 
   // Fold a lazy-delete paste into state, then offer the subchain prompt for each
@@ -2381,6 +2460,7 @@ export function MapCanvas({
           onEndpointContextMenu,
           isOnHomePath: homePathEdges.has(c.id),
           routeHighlighted: experimentalActive && routeHighlightConnectionIds.has(c.id),
+          onSignatureLinkDrop: experimentalActive ? onSignatureLinkDrop : undefined,
         },
         selected: selected?.kind === 'connection' && selected.id === c.id,
       };
@@ -2394,6 +2474,7 @@ export function MapCanvas({
     homePathEdges,
     experimentalActive,
     routeHighlightConnectionIds,
+    onSignatureLinkDrop,
   ]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
@@ -2848,6 +2929,7 @@ export function MapCanvas({
             connections={viewData.connections}
             systems={viewData.systems}
             onCreate={onSignatureCreate}
+            onCreateWithId={experimentalActive ? onSignatureCreateWithId : undefined}
             onPatch={onSignaturePatch}
             onDelete={onSignatureDelete}
             onConnectionPatch={onConnectionPatch}
@@ -2855,6 +2937,25 @@ export function MapCanvas({
             flashSigId={flashSigId}
             pasteFlash={pasteFlash}
             tagScheme={viewData.map.tagScheme}
+            experimentalUi={experimentalActive}
+            onSignatureHover={
+              experimentalActive
+                ? (sig) => {
+                    if (!sig?.mapConnectionId) {
+                      setSignatureHoverFarSystemId(null);
+                      return;
+                    }
+                    const conn = viewData.connections.find((c) => c.id === sig.mapConnectionId);
+                    if (!conn) {
+                      setSignatureHoverFarSystemId(null);
+                      return;
+                    }
+                    setSignatureHoverFarSystemId(
+                      conn.source === sig.mapSystemId ? conn.target : conn.source,
+                    );
+                  }
+                : undefined
+            }
           />
         );
       case 'sigSearch':

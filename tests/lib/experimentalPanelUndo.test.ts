@@ -23,6 +23,7 @@ describe('experimentalPanelUndo', () => {
       redo: () => {
         n += 1;
       },
+      serialized: { undo: { test: 1 }, redo: { test: 2 } },
     });
     expect(experimentalUndoCan('signatures').undo).toBe(true);
     await experimentalUndoApply('signatures');

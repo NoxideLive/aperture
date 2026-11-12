@@ -15,6 +15,7 @@ import { useEdgeAnchors } from './useEdgeAnchors';
 import { ConnectionBubble } from './ConnectionBubble';
 import { ConnectionEndpoint, type ConnectionEndpointState } from './ConnectionEndpoint';
 import { useMapLinkHover, useSetMapLinkHover } from './MapLinkHoverContext';
+import { SIGNATURE_DRAG_MIME } from '@/lib/experimentalSignatureUndo';
 
 // Selectable connection edge. Scope + mass status drive the stroke colour; EOL
 // dashes the line; flags (jump-mass / EOL / frigate / rolling / preserve) render
@@ -51,6 +52,8 @@ export type ConnectionEdgeData = MapConnectionEdge & {
   isOnHomePath?: boolean;
   /** Experimental route planner path highlight. */
   routeHighlighted?: boolean;
+  /** Drop a signature row onto this edge to link (experimental). */
+  onSignatureLinkDrop?: (connectionId: string, signatureId: string) => void;
 };
 
 export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) {
@@ -151,6 +154,20 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
           if (importance) {
             setLinkHover({ edgeId: null, sourceId: null, targetId: null });
           }
+        }}
+        onDragOver={(e) => {
+          if (!data.onSignatureLinkDrop) return;
+          if (e.dataTransfer.types.includes(SIGNATURE_DRAG_MIME)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'link';
+          }
+        }}
+        onDrop={(e) => {
+          if (!data.onSignatureLinkDrop) return;
+          const sigId = e.dataTransfer.getData(SIGNATURE_DRAG_MIME);
+          if (!sigId) return;
+          e.preventDefault();
+          data.onSignatureLinkDrop(props.id, sigId);
         }}
       >
         {importance && experimentalEolOutlineClass(data.eolStage) ? (
