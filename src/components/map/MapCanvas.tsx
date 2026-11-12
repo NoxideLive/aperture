@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Background,
   ConnectionMode,
@@ -16,10 +8,6 @@ import {
   ReactFlow,
   SelectionMode,
   applyNodeChanges,
-  useEdgesState,
-  useReactFlow,
-  useStore,
-  useStoreApi,
   type Connection,
   type Edge,
   type Node,
@@ -197,10 +185,6 @@ import { toast } from 'sonner';
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
 
-/** Fallback xyflow dimensions for system tiles before ResizeObserver measures them. */
-const SYSTEM_NODE_LAYOUT_SIZE = { width: 128, height: 52 } as const;
-const NOTE_NODE_LAYOUT_SIZE = { width: 120, height: 40 } as const;
-
 const COMMAND_PANEL_FOCUS_ORDER: PanelId[] = ['signatures', 'inspector', 'route', 'intel'];
 
 // Cadence for re-pulling read-side per-system intel/stats for systems already on
@@ -288,19 +272,6 @@ function mergeLayouts(
 
 const nodeTypes = { system: SystemNode, note: MapNoteNode };
 const edgeTypes = { connection: ConnectionEdge };
-
-/** Seeds xyflow's store when controlled `edges` fail to stick (React Strict Mode + ResizeObserver timing). */
-function MapFlowStoreEdgeSync({ edges }: { edges: Edge<ConnectionEdgeData>[] }) {
-  const store = useStoreApi();
-  const nodesInitialized = useStore((s) => s.nodesInitialized);
-  const rf = useReactFlow();
-  useLayoutEffect(() => {
-    if (!nodesInitialized) return;
-    store.getState().setEdges(edges);
-    rf.fitView({ padding: 0.15, duration: 0 });
-  }, [edges, store, nodesInitialized, rf]);
-  return null;
-}
 
 // xyflow node ids must be unique, but `ap_map_system.id` and `ap_map_note.id` are
 // independent identity sequences and so collide numerically. Namespace note nodes
@@ -535,12 +506,6 @@ export function MapCanvas({
       },
       selected: false,
       draggable: !s.locked,
-      width: SYSTEM_NODE_LAYOUT_SIZE.width,
-      height: SYSTEM_NODE_LAYOUT_SIZE.height,
-      measured: {
-        width: SYSTEM_NODE_LAYOUT_SIZE.width,
-        height: SYSTEM_NODE_LAYOUT_SIZE.height,
-      },
     })),
     ...data.notes.map((n) => ({
       id: noteNodeId(n.id),
@@ -549,12 +514,6 @@ export function MapCanvas({
       data: { ...n },
       selected: false,
       draggable: !n.locked,
-      width: NOTE_NODE_LAYOUT_SIZE.width,
-      height: NOTE_NODE_LAYOUT_SIZE.height,
-      measured: {
-        width: NOTE_NODE_LAYOUT_SIZE.width,
-        height: NOTE_NODE_LAYOUT_SIZE.height,
-      },
     })),
   ]);
   const appliedEventIds = useRef<Set<number>>(new Set());
@@ -1966,14 +1925,6 @@ export function MapCanvas({
             },
             selected: selectedSystemIds.has(s.id),
             draggable: !s.locked,
-            width:
-              existing?.width ?? existing?.measured?.width ?? SYSTEM_NODE_LAYOUT_SIZE.width,
-            height:
-              existing?.height ?? existing?.measured?.height ?? SYSTEM_NODE_LAYOUT_SIZE.height,
-            measured: existing?.measured ?? {
-              width: SYSTEM_NODE_LAYOUT_SIZE.width,
-              height: SYSTEM_NODE_LAYOUT_SIZE.height,
-            },
           };
         }),
         ...viewData.notes.map((n) => {
@@ -1989,19 +1940,13 @@ export function MapCanvas({
             data: { ...n, onOpen: onOpenNote },
             selected: selected?.kind === 'note' && selected.id === n.id,
             draggable: !n.locked,
-            width: existing?.width ?? existing?.measured?.width ?? NOTE_NODE_LAYOUT_SIZE.width,
-            height: existing?.height ?? existing?.measured?.height ?? NOTE_NODE_LAYOUT_SIZE.height,
-            measured: existing?.measured ?? {
-              width: NOTE_NODE_LAYOUT_SIZE.width,
-              height: NOTE_NODE_LAYOUT_SIZE.height,
-            },
           };
         }),
       ];
     });
   }
 
-  const connectionEdges = useMemo<Edge<ConnectionEdgeData>[]>(() => {
+  const edges = useMemo<Edge<ConnectionEdgeData>[]>(() => {
     // Resolve each connection's source wormhole from its attached signatures,
     // preferring the named side over the K162 reverse-exit (the named hole is the
     // one carrying routing / mass / lifetime static data). Feeds the edge's
@@ -2033,11 +1978,6 @@ export function MapCanvas({
       };
     });
   }, [viewData.connections, viewData.signatures, viewData.map.id, selected, onEndpointContextMenu]);
-
-  const [rfEdges, setRfEdges, onRfEdgesChange] = useEdgesState(connectionEdges);
-  useEffect(() => {
-    setRfEdges(connectionEdges);
-  }, [connectionEdges, setRfEdges]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
     if (selected?.kind !== 'system') return null;
@@ -2292,8 +2232,7 @@ export function MapCanvas({
             )}
             <ReactFlow
               nodes={nodes}
-              edges={rfEdges}
-              onEdgesChange={onRfEdgesChange}
+              edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               onNodeClick={onNodeClick}
@@ -2329,7 +2268,6 @@ export function MapCanvas({
               onMoveEnd={onMoveEnd}
               proOptions={{ hideAttribution: true }}
             >
-              <MapFlowStoreEdgeSync edges={connectionEdges} />
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>

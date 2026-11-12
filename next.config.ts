@@ -9,9 +9,6 @@ import type { NextConfig } from 'next';
 const imgSrc = "img-src 'self' data: blob: https://images.evetech.net";
 
 const nextConfig: NextConfig = {
-  // xyflow's StoreUpdater `reset()` on unmount leaves edges empty when React
-  // Strict Mode immediately remounts (nodes recover via onNodesChange; edges do not).
-  reactStrictMode: false,
   typedRoutes: true,
   // Dev only. Next blocks cross-origin dev requests, and a browser sends an
   // `Origin` header on the HMR websocket handshake but not on `<script src>`
