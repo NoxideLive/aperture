@@ -159,11 +159,8 @@ import { MapNoteNode, type MapNoteNodeData } from './MapNoteNode';
 import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
-<<<<<<< HEAD
-import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
-=======
 import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
->>>>>>> experimental-ui-chrome
+import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
