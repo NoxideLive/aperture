@@ -104,10 +104,11 @@
 /* Map link salience — experimental importance-ordered connections */
 [data-ui='experimental'] .ap-connection-eol-outline {
   stroke: #a855f7;
-  stroke-width: 5px;
+  stroke-width: 8px;
   stroke-linecap: round;
   stroke-linejoin: round;
-  animation: ap-eol-outline-pulse 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgb(168 85 247 / 0.75));
+  animation: ap-eol-outline-pulse 3.2s ease-in-out infinite;
 }
 
 [data-ui='experimental'][data-theme='light'] .ap-connection-eol-outline {
@@ -122,10 +123,25 @@
 @keyframes ap-eol-outline-pulse {
   0%,
   100% {
-    stroke-opacity: 0.5;
+    stroke-opacity: 0.45;
   }
   50% {
     stroke-opacity: 1;
+  }
+}
+
+[data-ui='experimental'] .ap-combat-ring {
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.85);
+  animation: ap-combat-ring-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ap-combat-ring-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(239 68 68 / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(239 68 68 / 0.95), 0 0 18px rgb(239 68 68 / 0.45);
   }
 }
 
@@ -145,4 +161,14 @@
   filter: brightness(1.12);
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
+}
+
+[data-ui='experimental'] .ap-pilot-hover-card.ap-pilot-standing-friendly {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #38bdf8 35%, transparent);
+}
+
+[data-ui='experimental'][data-pointer-cursor='on'] button:not(:disabled),
+[data-ui='experimental'][data-pointer-cursor='on'] [role='button']:not(:disabled) {
+  cursor: pointer;
 }

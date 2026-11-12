@@ -288,7 +288,7 @@ export type EdgeStyle = {
 };
 
 const IMPORTANCE_WH_FRESH_DARK = { stroke: '#6b7280', width: 1.5, opacity: 0.32 };
-const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.42 };
+const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.28 };
 const IMPORTANCE_WH_REDUCED_DARK = { stroke: '#f59e0b', width: 2.5, opacity: 0.95 };
 const IMPORTANCE_WH_REDUCED_LIGHT = { stroke: '#b45309', width: 2.5, opacity: 1 };
 const IMPORTANCE_WH_CRITICAL_DARK = { stroke: '#ef4444', width: 4, opacity: 1 };
