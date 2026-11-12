@@ -195,14 +195,18 @@ export function MapLayoutGrid({
       {ghostRect && (
         <div
           aria-hidden
-          className="pointer-events-none absolute z-10 rounded-md border-2 border-dashed border-primary bg-primary/10"
+          className="ap-panel-tearoff-ghost pointer-events-none absolute z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/15 shadow-[inset_0_0_0_1px_rgb(91_157_255/0.25)]"
           style={{
             left: ghostRect.left,
             top: ghostRect.top,
             width: ghostRect.width,
             height: ghostRect.height,
           }}
-        />
+        >
+          <span className="rounded-md bg-background/90 px-2 py-0.5 text-xs font-medium text-primary shadow-sm">
+            Drop panel here
+          </span>
+        </div>
       )}
     </div>
   );

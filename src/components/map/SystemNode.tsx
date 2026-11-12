@@ -65,6 +65,8 @@ export type SystemNodeData = MapSystemNode & {
   inFactionWarfare?: boolean;
   /** Derived in `MapCanvas` from the load-time intel: this system is part of an active incursion. */
   hasIncursion?: boolean;
+  /** Experimental: sidebar panel row is hovering this system. */
+  panelHoverLinked?: boolean;
 };
 
 function securityLabel(node: MapSystemNode): string {
@@ -145,6 +147,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
         'group relative min-w-30 cursor-pointer rounded-md bg-map-node text-xs text-card-foreground transition-[box-shadow,outline,transform,opacity,filter] duration-50',
         endpointLit ? 'ap-link-endpoint-lit' : '',
         linkDim && !endpointLit ? 'ap-link-hover-dimmed' : '',
+        data.panelHoverLinked ? 'ap-panel-linked' : '',
       ]
         .filter(Boolean)
         .join(' ')}

@@ -8,6 +8,7 @@ import { systemClassColor } from '@/components/map/styling';
 import { fetchTheraConnections, syncTheraConnectionsOnServer } from '@/lib/map/client';
 import type { MapViewData } from '@/lib/map/loadMap';
 import type { MapEventPayload, TheraConnection, TheraSyncInput } from '@/types';
+import { subscribeExperimentalPanelAdd } from '@/lib/experimentalPanelActionBus';
 
 // Global Thera module. Lists EVE-Scout's published Thera + Turnur
 // connections and folds chosen ones onto the open map. Unlike the system-scoped
@@ -99,6 +100,8 @@ export function TheraModule({
     ].filter((g) => g.rows.length > 0);
   }, [annotated]);
 
+  const missing = useMemo(() => annotated.filter((c) => !c.onMap), [annotated]);
+
   const sync = useCallback(
     async (rows: TheraConnection[]) => {
       if (rows.length === 0) return;
@@ -114,6 +117,14 @@ export function TheraModule({
       }
     },
     [mapId, onBulkPaste],
+  );
+
+  useEffect(
+    () =>
+      subscribeExperimentalPanelAdd('thera', () => {
+        void sync(missing);
+      }),
+    [sync, missing],
   );
 
   return (

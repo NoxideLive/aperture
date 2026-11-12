@@ -24,14 +24,25 @@ All features below require the experimental UI (`ap_ui` cookie). Legacy UI is un
 - Command palette: jump to system, theme switches, experimental toggles.
 - Paste preview dialog and auto mass-from-log (off by default).
 
-## Panels (BUILD 2 slice)
+## Panels (BUILD 2)
 
-- Default layout uses tab groups: Inspector+Intel, Routes, Killboard+Kill stats, Thera+D-Scan search, System graph+Tags, Structures; signatures stay full-width under the map.
+- Default layout uses tab groups: Inspector+Intel, Routes (+ Current Route), Killboard+Kill stats, Thera+D-Scan search, System graph+Tags, Structures; signatures stay full-width under the map.
+- Dedicated **Pilots**, **Kills**, **D-Scan**, and **Current Route** panels in the registry and experimental default layout.
 - Empty Inspector shows a **chain summary** (systems, pilots, EOL links).
 - Routes panel highlights the first reachable path on the map (cyan glow on WH links).
-- Per-panel undo stacks and **Ctrl+Z / Ctrl+Shift+Z** on the focused panel (in-memory; map/signatures wiring grows incrementally).
-- Panel merge targets pulse while dragging tabs; grid ghost shows tear-off placement.
+- Per-panel **+ Add** header actions (see `docs/aperture-panel-actions.md`) and matching command-palette entries.
+- **Signature clean up** dialog (toolbar + signatures panel header + palette): chain or selected-system scope, filter preview, preferences saved in layout `panelSettings.signatures`.
+- Layout presets (**Scanning**, **Combat**, **Travel**) in the toolbar Panels menu; `layoutPreset` stored in saved layout.
+- Panel merge targets pulse while dragging tabs; larger tab drag ghost and tear-off drop zone label.
+- Per-panel undo stacks and **Ctrl+Z / Ctrl+Shift+Z** on the focused panel (in-memory).
+- Account settings (experimental): **Device** scope badges and search filter on experimental sections.
 
-## Not in this branch yet
+## Routes (BUILD 2 data)
 
-See `docs/plans/build2-blocked-proposals.md` for active routes, staging, per-map route pins, dedicated Pilots/Kills/D-Scan/Current Route panels, full signature cleanup UI, and persisted undo.
+- Per-map route favourites and **active route** row (`ap_map_active_route`) with multi-waypoint ESI sequence push.
+- **Current Route** panel for the saved hop list.
+
+## Not persisted yet
+
+- Undo stacks across reload (in-memory only).
+- See `docs/plans/build2-blocked-proposals.md` for staging systems and other deferred schema items.

@@ -18,8 +18,10 @@ describe('defaultMapLayoutForUi', () => {
   it('groups the right column tab strips while keeping the legacy default untouched', () => {
     const inspector = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'inspector');
     expect(inspector?.members).toEqual(['inspector', 'intel']);
+    const route = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'route');
+    expect(route?.members).toContain('currentRoute');
     const thera = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'thera');
-    expect(thera?.members).toContain('sigSearch');
+    expect(thera?.members).toContain('dscan');
     expect(EXPERIMENTAL_DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(8);
     expect(DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(6);
   });

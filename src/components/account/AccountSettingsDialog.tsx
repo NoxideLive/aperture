@@ -120,6 +120,14 @@ export function AccountSettingsDialog({
   const [rallyDesktop, setRallyDesktop] = useState(readExperimentalRallyDesktopNotification);
   const [combatSound, setCombatSound] = useState(readExperimentalCombatAlertSound);
   const [autoMass, setAutoMass] = useState(readExperimentalAutoMassFromLog);
+  const [experimentalSettingsQuery, setExperimentalSettingsQuery] = useState('');
+
+  function experimentalSectionVisible(...labels: string[]): boolean {
+    if (!experimentalOn) return true;
+    const q = experimentalSettingsQuery.trim().toLowerCase();
+    if (!q) return true;
+    return labels.some((label) => label.toLowerCase().includes(q));
+  }
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -313,10 +321,25 @@ export function AccountSettingsDialog({
           </div>
 
           <fieldset className="mt-2 flex flex-col gap-2 rounded-lg border border-border p-3">
-            <legend className="px-1 text-sm font-medium text-foreground">Experimental UI</legend>
+            <legend className="px-1 flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+              Experimental UI
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                Device
+              </span>
+            </legend>
             <p className="text-xs text-muted-foreground">
               Opt-in preview styling on this device. Stored in a cookie; no page reload.
             </p>
+            {experimentalOn ? (
+              <input
+                type="search"
+                placeholder="Filter experimental sections…"
+                value={experimentalSettingsQuery}
+                onChange={(e) => setExperimentalSettingsQuery(e.target.value)}
+                className="border-input h-8 w-full max-w-sm rounded-md border px-2 text-sm"
+                aria-label="Filter experimental settings"
+              />
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {EXPERIMENTAL_UI_CHOICES.map(({ value, label }) => (
                 <label
@@ -337,10 +360,13 @@ export function AccountSettingsDialog({
                 </label>
               ))}
             </div>
-            {experimentalOn ? (
+            {experimentalOn && experimentalSectionVisible('hover delay') ? (
               <div className="mt-1 flex flex-col gap-1">
-                <label htmlFor="experimental-hover-delay" className="text-sm font-medium text-foreground">
+                <label htmlFor="experimental-hover-delay" className="flex items-center gap-2 text-sm font-medium text-foreground">
                   Hover delay (ms)
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    Device
+                  </span>
                 </label>
                 <p className="text-xs text-muted-foreground">
                   Tooltips and hover cards on the map wait this long before opening. Stored on this device.
@@ -374,8 +400,14 @@ export function AccountSettingsDialog({
                 />
               </div>
             ) : null}
-            {experimentalOn ? (
+            {experimentalOn && experimentalSectionVisible('qol', 'selection', 'pointer', 'paste', 'mass') ? (
               <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
+                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  Quality of life
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    Device
+                  </span>
+                </p>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -426,9 +458,14 @@ export function AccountSettingsDialog({
                 </label>
               </div>
             ) : null}
-            {experimentalOn ? (
+            {experimentalOn && experimentalSectionVisible('alerts', 'rally', 'combat', 'sound') ? (
               <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
-                <p className="text-sm font-medium text-foreground">Experimental alerts</p>
+                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  Experimental alerts
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    Device
+                  </span>
+                </p>
                 <p className="text-xs text-muted-foreground">Off by default. Stored on this device.</p>
                 <label className="flex items-center gap-2 text-sm">
                   <input

@@ -73,9 +73,9 @@ export function PanelDndContext({ onDragEnd, children }: PanelDndContextProps) {
       {children}
       <DragOverlay>
         {activePanel ? (
-          <span className="rounded-md border bg-popover px-1.5 py-0.5 font-heading text-sm shadow-md">
+          <div className="ap-panel-dnd-ghost rounded-lg border-2 border-primary bg-popover px-4 py-2 font-heading text-base shadow-xl ring-4 ring-primary/20">
             {PANEL_TITLES[activePanel]}
-          </span>
+          </div>
         ) : null}
       </DragOverlay>
     </DndContext>

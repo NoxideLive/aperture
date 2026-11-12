@@ -26,14 +26,18 @@ import type {
   MapCapability,
   MapContextMenuTarget,
   MapEventPayload,
+  ExperimentalLayoutPreset,
   MapLayoutConfig,
   MapSettings,
   MapSignature,
+  SignatureGroupKey,
   MapSystemNode,
   MapViewData,
   PanelGroup,
   PanelId,
   RouteDestinationView,
+  MapActiveRouteView,
+  MapRouteFavouriteView,
   RoutePlan,
   RoutePrefs,
   SignatureIndicatorPrefs,
@@ -110,6 +114,7 @@ import {
   RotateCcw,
   ScrollText,
   Settings,
+  Sparkles,
   Trash2,
   Upload,
   User,
@@ -127,6 +132,7 @@ import {
   Menu,
   MenuCheckboxItem,
   MenuContent,
+  MenuGroupLabel,
   MenuItem,
   MenuSeparator,
   MenuTrigger,
@@ -159,6 +165,10 @@ import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
 import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
 import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
 import { ExperimentalUndoHotkeys } from './ExperimentalUndoHotkeys';
+import { CurrentRoutePanel } from '@/components/sidebar/CurrentRoutePanel';
+import { ExperimentalPilotsPanel } from '@/components/sidebar/ExperimentalPilotsPanel';
+import { ExperimentalKillsPanel } from '@/components/sidebar/ExperimentalKillsPanel';
+import { ExperimentalDscanPanel } from '@/components/sidebar/ExperimentalDscanPanel';
 import { SystemNotificationSoundBridge } from './SystemNotificationSoundBridge';
 import { WatchedConnectionSoundBridge } from './WatchedConnectionSoundBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
@@ -177,7 +187,6 @@ import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
 import {
-  DEFAULT_MAP_LAYOUT,
   defaultMapLayoutForUi,
   PANELS,
   PANEL_COLS,
@@ -190,15 +199,55 @@ import {
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
+import { experimentalLayoutPreset } from '@/lib/experimentalLayoutPresets';
+import {
+  DEFAULT_SIGNATURE_CLEANUP_SETTINGS,
+  SignatureCleanupDialog,
+  type SignatureCleanupPanelSettings,
+} from '@/components/dialogs/SignatureCleanupDialog';
+import {
+  ExperimentalPanelAddButton,
+  experimentalPanelSupportsAdd,
+} from '@/components/map/experimentalPanelHeaderActions';
+import {
+  requestExperimentalPanelAdd,
+  subscribeExperimentalPanelAdd,
+} from '@/lib/experimentalPanelActionBus';
 import { readExperimentalAutoMassFromLog, readKeepMapSelection } from '@/lib/experimentalQolPrefs';
 import { massStatusFromCumulative } from '@/lib/experimentalAutoMass';
 import { fetchWormholeJumpInfo } from '@/lib/reference/client';
 import type { WormholeJumpInfoRow } from '@/types';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { experimentalUndoPush } from '@/lib/experimentalPanelUndo';
 
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
+
+function parseSignatureCleanupSettings(
+  layout: MapLayoutConfig,
+): SignatureCleanupPanelSettings {
+  const raw = layout.panelSettings?.signatures;
+  if (!raw || typeof raw !== 'object') return DEFAULT_SIGNATURE_CLEANUP_SETTINGS;
+  const scope = raw.scope === 'chain' ? 'chain' : 'system';
+  const groups = Array.isArray(raw.groups)
+    ? raw.groups.filter((g): g is SignatureGroupKey => typeof g === 'string')
+    : DEFAULT_SIGNATURE_CLEANUP_SETTINGS.groups;
+  return {
+    scope,
+    olderThanHours:
+      typeof raw.olderThanHours === 'number'
+        ? raw.olderThanHours
+        : raw.olderThanHours === null
+          ? null
+          : DEFAULT_SIGNATURE_CLEANUP_SETTINGS.olderThanHours,
+    unscannedOnly: raw.unscannedOnly === true,
+    staleByIndicator: raw.staleByIndicator !== false,
+    whLinkExpired: raw.whLinkExpired === true,
+    groups,
+  };
+}
 
 const COMMAND_PANEL_FOCUS_ORDER: PanelId[] = ['signatures', 'inspector', 'route', 'intel'];
 
@@ -329,6 +378,8 @@ export function MapCanvas({
   routeDestinations,
   mapLayout,
   initialExperimentalUi,
+  mapRouteFavourites = [],
+  mapActiveRoute = null,
 }: {
   data: MapViewData;
   stats: Record<number, SystemStatsSummary>;
@@ -376,6 +427,8 @@ export function MapCanvas({
   mapLayout?: MapLayoutConfig | null;
   /** SSR-resolved experimental UI mode for seeding the default layout when `mapLayout` is null. */
   initialExperimentalUi: import('@/lib/experimentalUi').ExperimentalUiMode;
+  mapRouteFavourites?: MapRouteFavouriteView[];
+  mapActiveRoute?: MapActiveRouteView | null;
 }) {
   const [selected, setSelected] = useState<SelectionRef | null>(null);
   const [lastPrimarySystem, setLastPrimarySystem] = useState<MapSystemNode | null>(null);
@@ -429,6 +482,7 @@ export function MapCanvas({
   // One-shot "Lazy delete" arm for the CTRL+V fast paste: when on, the next
   // direct scanner paste also removes missing sigs, then disarms itself.
   const [lazyDeleteSigs, setLazyDeleteSigs] = useState(false);
+  const [sigCleanupOpen, setSigCleanupOpen] = useState(false);
   const [viewData, setViewData] = useState<MapViewData>(data);
   const [liveShares, setLiveShares] = useState<LiveShareBadge[]>(initialLiveShares);
   // Captured via ReactFlow's onInit so the manual-add flow can place new nodes
@@ -612,6 +666,8 @@ export function MapCanvas({
   const [routeHighlightConnectionIds, setRouteHighlightConnectionIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const router = useRouter();
+  const [pilotHoverSystemId, setPilotHoverSystemId] = useState<string | null>(null);
   const onRoutePlanHighlight = useCallback((plan: RoutePlan | null) => {
     if (!plan?.reachable) {
       setRouteHighlightConnectionIds(new Set());
@@ -686,6 +742,41 @@ export function MapCanvas({
       clearTimeout(flashTimer.current ?? undefined);
       clearTimeout(pasteFlashTimer.current ?? undefined);
     },
+    [],
+  );
+
+  const signatureCleanupSettings = useMemo(
+    () => parseSignatureCleanupSettings(layout),
+    [layout],
+  );
+
+  const persistSignatureCleanupSettings = useCallback(
+    (next: SignatureCleanupPanelSettings) => {
+      setLayout((prev) => {
+        const updated: MapLayoutConfig = {
+          ...prev,
+          panelSettings: { ...prev.panelSettings, signatures: next },
+        };
+        saveLayout(updated);
+        return updated;
+      });
+    },
+    [saveLayout],
+  );
+
+  const applyLayoutPreset = useCallback(
+    (preset: ExperimentalLayoutPreset) => {
+      const next = ensurePanelsPlaced(dedupeGroups(migrateLayout(experimentalLayoutPreset(preset))));
+      setLayout(next);
+      firstLayoutChange.current = false;
+      saveLayout(next);
+      toast.success(`Layout preset: ${preset}`);
+    },
+    [saveLayout],
+  );
+
+  useEffect(
+    () => subscribeExperimentalPanelAdd('inspector', () => setAddSystemOpen(true)),
     [],
   );
 
@@ -982,10 +1073,10 @@ export function MapCanvas({
   // Reset to the shipped arrangement. Clone so later immutable updates can never
   // mutate the shared `DEFAULT_MAP_LAYOUT` constant.
   const handleResetLayout = useCallback(() => {
-    const next = structuredClone(DEFAULT_MAP_LAYOUT);
+    const next = structuredClone(defaultMapLayoutForUi(experimentalActive));
     setLayout(next);
     saveLayout(next);
-  }, [saveLayout]);
+  }, [saveLayout, experimentalActive]);
 
   // Download the current arrangement as a shareable JSON file. The exported blob
   // is exactly `MapLayoutConfig` — the same shape the import validator accepts.
@@ -1591,6 +1682,7 @@ export function MapCanvas({
   // ---- Inspector callbacks -----------------------------------------------
   const onSystemPatch = useCallback(
     (mapSystemId: string, patch: UpdateSystemBody) => {
+      const prev = viewData.systems.find((s) => s.id === mapSystemId);
       const opt: MapEventPayload = {
         kind: 'system.updated',
         eventId: 0,
@@ -1598,8 +1690,24 @@ export function MapCanvas({
         ...patch,
       };
       runOptimistic(opt, () => updateSystemOnServer({ mapId, mapSystemId, patch }));
+      if (experimentalActive && prev) {
+        const inverse: UpdateSystemBody = {};
+        for (const key of Object.keys(patch) as (keyof UpdateSystemBody)[]) {
+          const k = key;
+          (inverse as Record<string, unknown>)[k] = (prev as Record<string, unknown>)[k];
+        }
+        experimentalUndoPush('map', {
+          label: 'Edit system',
+          undo: () => {
+            void updateSystemOnServer({ mapId, mapSystemId, patch: inverse });
+          },
+          redo: () => {
+            void updateSystemOnServer({ mapId, mapSystemId, patch });
+          },
+        });
+      }
     },
-    [mapId, runOptimistic],
+    [mapId, runOptimistic, experimentalActive, viewData.systems],
   );
 
   const onSystemRemove = useCallback(
@@ -1784,6 +1892,13 @@ export function MapCanvas({
       if (offer) setSubchainSigPrompts((q) => [...q, offer]);
     },
     [mapId, runOptimistic, viewData, buildSubchainSigOffer],
+  );
+
+  const onBulkSignatureCleanup = useCallback(
+    (signatureIds: string[]) => {
+      for (const id of signatureIds) onSignatureDelete(id);
+    },
+    [onSignatureDelete],
   );
 
   // Scan committed paste payloads for wormhole sigs whose remembered connection
@@ -2010,6 +2125,7 @@ export function MapCanvas({
     // multi-select set), so a note selection change must trigger a re-sync.
     selected: SelectionRef | null;
     intel: Record<number, SystemIntelSummary>;
+    pilotHoverSystemId: string | null;
   } | null>(null);
   if (
     !lastSync ||
@@ -2017,6 +2133,7 @@ export function MapCanvas({
     lastSync.notes !== viewData.notes ||
     lastSync.selectedSystemIds !== selectedSystemIds ||
     lastSync.selected !== selected ||
+    lastSync.pilotHoverSystemId !== pilotHoverSystemId ||
     // `intel` is replaced by reference when a live-added system's data backfills;
     // re-sync so its decorators (sov/FW/incursion) appear without a systems change.
     lastSync.intel !== intel
@@ -2027,6 +2144,7 @@ export function MapCanvas({
       selectedSystemIds,
       selected,
       intel,
+      pilotHoverSystemId,
     });
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
@@ -2047,6 +2165,7 @@ export function MapCanvas({
               isHome: s.id === viewData.map.homeMapSystemId,
               inFactionWarfare: intel[s.systemId]?.factionWar != null,
               hasIncursion: intel[s.systemId]?.incursion != null,
+              panelHoverLinked: experimentalActive && pilotHoverSystemId === s.id,
             },
             selected: selectedSystemIds.has(s.id),
             draggable: !s.locked,
@@ -2342,6 +2461,29 @@ export function MapCanvas({
       });
     }
   if (experimentalActive) {
+      const panelAddLabels: Partial<Record<PanelId, string>> = {
+        route: 'Routes: Add destination',
+        pilots: 'Pilots: Open roster',
+        kills: 'Kills: Refresh feed',
+        dscan: 'D-Scan: Focus paste',
+        thera: 'Eve-Scout: Sync missing',
+        inspector: 'Inspector: Add system',
+      };
+      for (const [panelId, label] of Object.entries(panelAddLabels) as [PanelId, string][]) {
+        if (!experimentalPanelSupportsAdd(panelId)) continue;
+        actions.push({
+          id: `panel-add-${panelId}`,
+          label,
+          keywords: 'add panel header',
+          run: () => requestExperimentalPanelAdd(panelId),
+        });
+      }
+      actions.push({
+        id: 'signature-cleanup',
+        label: 'Signatures: Clean up…',
+        keywords: 'delete stale bulk',
+        run: () => setSigCleanupOpen(true),
+      });
       actions.push({
         id: 'center-selected',
         label: 'Jump to selected system (center map)',
@@ -2593,6 +2735,10 @@ export function MapCanvas({
             connections={viewData.connections}
             signatures={viewData.signatures}
             onPlanHighlight={experimentalActive ? onRoutePlanHighlight : undefined}
+            mapRouteFavourites={experimentalActive ? mapRouteFavourites : undefined}
+            onActiveRouteSaved={
+              experimentalActive ? () => router.refresh() : undefined
+            }
           />
         );
       case 'intel':
@@ -2629,6 +2775,18 @@ export function MapCanvas({
         return <TagsModule viewData={viewData} selectedSystemId={selectedSystem?.id ?? null} />;
       case 'thera':
         return <TheraModule mapId={mapId} viewData={viewData} onBulkPaste={onBulkPaste} />;
+      case 'currentRoute':
+        return experimentalActive ? (
+          <CurrentRoutePanel activeRoute={mapActiveRoute} viewData={viewData} />
+        ) : null;
+      case 'pilots':
+        return experimentalActive ? (
+          <ExperimentalPilotsPanel viewData={viewData} onHoverSystem={setPilotHoverSystemId} />
+        ) : null;
+      case 'kills':
+        return experimentalActive ? <ExperimentalKillsPanel system={selectedSystem ?? undefined} /> : null;
+      case 'dscan':
+        return experimentalActive ? <ExperimentalDscanPanel system={selectedSystem ?? undefined} /> : null;
     }
   };
 
@@ -2642,8 +2800,13 @@ export function MapCanvas({
           onBulkPaste={onSignaturePasteResult}
           lazyDelete={lazyDeleteSigs}
           onLazyDeleteChange={setLazyDeleteSigs}
+          showCleanup={experimentalActive}
+          onOpenCleanup={() => setSigCleanupOpen(true)}
         />
       );
+    }
+    if (experimentalActive && experimentalPanelSupportsAdd(id)) {
+      return <ExperimentalPanelAddButton panelId={id} />;
     }
     return undefined;
   };
@@ -2721,6 +2884,17 @@ export function MapCanvas({
                   </div>
                   <div className="ap-map-toolbar flex shrink-0 items-center gap-1">
                     {experimentalActive ? <ExperimentalThemeToggle /> : null}
+                    {experimentalActive ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSigCleanupOpen(true)}
+                        title="Clean up signatures"
+                      >
+                        <Sparkles />
+                        Clean up
+                      </Button>
+                    ) : null}
                     <ActiveCharSelector />
                     <PilotRosterButton viewData={viewData} />
                     {soundsOn && <SoundToolbarButton />}
@@ -2745,6 +2919,21 @@ export function MapCanvas({
                           </MenuCheckboxItem>
                         ))}
                         <MenuSeparator />
+                        {experimentalActive ? (
+                          <>
+                            <MenuGroupLabel>Layout presets</MenuGroupLabel>
+                            <MenuItem onClick={() => applyLayoutPreset('scanning')}>
+                              Scanning focus
+                            </MenuItem>
+                            <MenuItem onClick={() => applyLayoutPreset('combat')}>
+                              Combat focus
+                            </MenuItem>
+                            <MenuItem onClick={() => applyLayoutPreset('travel')}>
+                              Travel focus
+                            </MenuItem>
+                            <MenuSeparator />
+                          </>
+                        ) : null}
                         <MenuItem
                           icon={<Download className="size-3.5" />}
                           onClick={handleExportLayout}
@@ -2835,6 +3024,21 @@ export function MapCanvas({
                   open={commandOpen}
                   onOpenChange={setCommandOpen}
                   actions={commandActions}
+                />
+              ) : null}
+              {experimentalActive ? (
+                <SignatureCleanupDialog
+                  open={sigCleanupOpen}
+                  onOpenChange={setSigCleanupOpen}
+                  mapId={mapId}
+                  selectedSystem={selectedSystem}
+                  systems={viewData.systems}
+                  signatures={viewData.signatures}
+                  connections={viewData.connections}
+                  indicatorPrefs={signatureIndicators}
+                  settings={signatureCleanupSettings}
+                  onSettingsChange={persistSignatureCleanupSettings}
+                  onDeleteSignatures={onBulkSignatureCleanup}
                 />
               ) : null}
               <MapInfoDialog open={mapInfoOpen} onOpenChange={setMapInfoOpen} viewData={viewData} />

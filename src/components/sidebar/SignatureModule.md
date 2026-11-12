@@ -63,7 +63,7 @@ A frameless `Card` (no card header) with:
 
 ## SignatureModuleHeaderActions
 
-**Purpose:** The **Lazy delete** arm toggle and **Paste from scanner** button for the Signatures panel, rendered into the `MapPanelGroup` header (via `renderHeaderRight` for the active tab) beside the panel title rather than inside the card.
+**Purpose:** The **Lazy delete** arm toggle and **Paste from scanner** button for the Signatures panel, rendered into the `MapPanelGroup` header (via `renderHeaderRight` for the active tab) beside the panel title rather than inside the card. Experimental UI also renders **Clean up** (`onOpenCleanup` / `showCleanup`).
 **Exported from:** `src/components/sidebar/SignatureModule.tsx`
 
 ### Props

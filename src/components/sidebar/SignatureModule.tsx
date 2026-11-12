@@ -1,7 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ClipboardPaste, Plus, ShieldCheck, Swords, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ClipboardPaste,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Swords,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   createColumnHelper,
@@ -703,6 +712,8 @@ export function SignatureModuleHeaderActions({
   onBulkPaste,
   lazyDelete,
   onLazyDeleteChange,
+  onOpenCleanup,
+  showCleanup,
 }: {
   mapId: string;
   system: MapSystemNode | null;
@@ -710,9 +721,24 @@ export function SignatureModuleHeaderActions({
   onBulkPaste: (payloads: MapEventPayload[]) => void;
   lazyDelete: boolean;
   onLazyDeleteChange: (next: boolean) => void;
+  /** Experimental signature bulk-delete dialog. */
+  onOpenCleanup?: () => void;
+  showCleanup?: boolean;
 }) {
   return (
     <>
+      {showCleanup ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => onOpenCleanup?.()}
+        >
+          <Sparkles className="size-3.5" />
+          Clean up
+        </Button>
+      ) : null}
       {system && (
         <>
           <LazyDeleteToggle armed={lazyDelete} onArmedChange={onLazyDeleteChange} />

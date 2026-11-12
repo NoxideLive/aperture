@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { usePresenceForMap } from '@/components/map/MapPresenceContext';
 import { PilotRoster } from '@/components/map/PilotRoster';
 import type { MapSystemNode, MapViewData } from '@/types';
+import { subscribeExperimentalPanelAdd } from '@/lib/experimentalPanelActionBus';
 
 // How often to refresh the "who has the map open" roster while the popover is
 // open. Viewer presence is server-side socket state polled over HTTP (no
@@ -25,6 +26,11 @@ const VIEWERS_POLL_MS = 15_000;
 export function PilotRosterButton({ viewData }: { viewData: MapViewData }) {
   const presence = usePresenceForMap();
   const [open, setOpen] = useState(false);
+
+  useEffect(
+    () => subscribeExperimentalPanelAdd('pilots', () => setOpen(true)),
+    [],
+  );
   const [viewerIds, setViewerIds] = useState<ReadonlySet<number>>(() => new Set());
 
   // EVE solar-system id → placed map node, for the roster's map-specific tag.

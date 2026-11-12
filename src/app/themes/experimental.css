@@ -230,6 +230,12 @@
   outline-offset: 2px;
 }
 
+[data-ui='experimental'] .react-flow__node.ap-panel-linked .group {
+  outline: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  outline-offset: 3px;
+  filter: brightness(1.08);
+}
+
 [data-ui='experimental'] .ap-pilot-hover-card.ap-pilot-standing-friendly {
   border-color: #38bdf8;
   box-shadow: 0 0 0 1px color-mix(in srgb, #38bdf8 35%, transparent);
@@ -248,6 +254,25 @@
 
 [data-ui='experimental'] .ap-panel-merge-target {
   animation: ap-panel-merge-pulse 1.2s ease-in-out infinite;
+}
+
+[data-ui='experimental'] .ap-panel-dnd-ghost {
+  opacity: 0.96;
+  transform: scale(1.04);
+}
+
+[data-ui='experimental'] .ap-panel-tearoff-ghost {
+  animation: ap-panel-tearoff-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes ap-panel-tearoff-pulse {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  50% {
+    border-color: var(--primary);
+  }
 }
 
 @keyframes ap-panel-merge-pulse {
