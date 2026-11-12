@@ -50,9 +50,9 @@ async function main() {
   for (let i = 0; i < byIdx.length - 1; i++) {
     conns.push({
       mapId: map!.id,
-      source: byIdx[i]!,
-      target: byIdx[i + 1]!,
-      scope: 'wormhole' as const,
+      sourceMapSystemId: byIdx[i]!,
+      targetMapSystemId: byIdx[i + 1]!,
+      scope: 'wh' as const,
       massStatus: 'fresh' as const,
       eolStage: 'none' as const,
     });
