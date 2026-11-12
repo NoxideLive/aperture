@@ -9,7 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { ChevronDown, GripVertical, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
 
@@ -42,6 +42,8 @@ export interface MapPanelGroupProps {
   renderHeaderRight: (id: PanelId) => ReactNode;
   /** Resolves the body class for the active member (canvas needs `overflow-hidden`). */
   contentClassName?: (id: PanelId) => string | undefined;
+  /** Experimental only: parent shrinks the RGL cell when collapse toggles. */
+  onExperimentalCollapseChange?: (groupId: string, collapsed: boolean) => void;
 }
 
 // One tab: a dnd-kit sortable whose id is the member `PanelId` (unique within a
@@ -106,6 +108,7 @@ export function MapPanelGroup({
   renderContent,
   renderHeaderRight,
   contentClassName,
+  onExperimentalCollapseChange,
 }: MapPanelGroupProps) {
   const visibleMembers = group.members.filter((m) => !hidden.includes(m));
   const { setNodeRef: setDroppableRef, isOver, active } = useDroppable({
@@ -128,7 +131,14 @@ export function MapPanelGroup({
       if (next) sessionStorage.setItem(collapseKey, '1');
       else sessionStorage.removeItem(collapseKey);
     } catch {}
+    if (experimental) onExperimentalCollapseChange?.(group.id, next);
   }
+
+  useEffect(() => {
+    if (experimental && collapsed) {
+      onExperimentalCollapseChange?.(group.id, true);
+    }
+  }, [collapsed, experimental, group.id, onExperimentalCollapseChange]);
   if (visibleMembers.length === 0) return null;
   const activeMember = visibleMembers.includes(group.active) ? group.active : visibleMembers[0]!;
   const isSingle = visibleMembers.length === 1;
@@ -136,7 +146,7 @@ export function MapPanelGroup({
   const isMergeTarget = isOver && active != null && !visibleMembers.includes(active.id as PanelId);
 
   return (
-    <Card className="h-full gap-0 py-0">
+    <Card className={cn(experimental && collapsed ? 'h-auto' : 'h-full', 'gap-0 py-0')}>
       <div
         ref={setDroppableRef}
         className={cn(
