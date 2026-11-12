@@ -29,6 +29,14 @@ import { DeleteAccountDialog } from './DeleteAccountDialog';
 import { SoundPicker } from './SoundPicker';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import type { ExperimentalUiMode } from '@/lib/experimentalUi';
+import {
+  DEFAULT_EXPERIMENTAL_HOVER_DELAY_MS,
+  EXPERIMENTAL_HOVER_DELAY_MAX_MS,
+  EXPERIMENTAL_HOVER_DELAY_MIN_MS,
+  clampExperimentalHoverDelayMs,
+} from '@/lib/experimentalHoverDelay';
+import { useExperimentalHoverDelayContext } from '@/lib/experimentalHoverDelay.client';
+import { isExperimentalUiActive } from '@/lib/experimentalUi';
 
 const EXPERIMENTAL_UI_CHOICES: { value: ExperimentalUiMode; label: string }[] = [
   { value: 'off', label: 'Off' },
@@ -84,6 +92,9 @@ export function AccountSettingsDialog({
   const [travelOn, setTravelOn] = useState(travelAnimation);
   const [pending, startTransition] = useTransition();
   const [experimentalUi, setExperimentalUi] = useExperimentalUi();
+  const { delayMs: hoverDelayMs, setDelayMs: setHoverDelayMs } = useExperimentalHoverDelayContext();
+  const [hoverDelayInput, setHoverDelayInput] = useState(String(hoverDelayMs));
+  const experimentalOn = isExperimentalUiActive(experimentalUi);
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -301,6 +312,43 @@ export function AccountSettingsDialog({
                 </label>
               ))}
             </div>
+            {experimentalOn ? (
+              <div className="mt-1 flex flex-col gap-1">
+                <label htmlFor="experimental-hover-delay" className="text-sm font-medium text-foreground">
+                  Hover delay (ms)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Tooltips and hover cards on the map wait this long before opening. Stored on this device.
+                </p>
+                <input
+                  id="experimental-hover-delay"
+                  type="number"
+                  min={EXPERIMENTAL_HOVER_DELAY_MIN_MS}
+                  max={EXPERIMENTAL_HOVER_DELAY_MAX_MS}
+                  step={25}
+                  className="border-input bg-background h-9 w-full max-w-[8rem] rounded-md border px-2 text-sm"
+                  value={hoverDelayInput}
+                  onChange={(e) => setHoverDelayInput(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = hoverDelayInput.trim();
+                    if (trimmed === '') {
+                      setHoverDelayInput(String(DEFAULT_EXPERIMENTAL_HOVER_DELAY_MS));
+                      setHoverDelayMs(DEFAULT_EXPERIMENTAL_HOVER_DELAY_MS);
+                      return;
+                    }
+                    const parsed = Number(trimmed);
+                    if (!Number.isFinite(parsed)) {
+                      setHoverDelayInput(String(hoverDelayMs));
+                      toast.error('Enter a number of milliseconds.');
+                      return;
+                    }
+                    const next = clampExperimentalHoverDelayMs(parsed);
+                    setHoverDelayInput(String(next));
+                    setHoverDelayMs(next);
+                  }}
+                />
+              </div>
+            ) : null}
           </fieldset>
 
           <label className="mt-2 flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">

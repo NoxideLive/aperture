@@ -38,6 +38,7 @@ import { homeAccentColor, systemClassColor, systemEffectColor, systemStatusColor
 import { useMapStyleOptions } from './MapStyleContext';
 import { InlineTextEdit } from './InlineTextEdit';
 import { StaticDetailPopover } from './StaticDetailPopover';
+import { useExperimentalHoverTriggerDelays } from '@/lib/experimentalHoverDelay.client';
 import { SystemPresenceTable } from './SystemPresenceTable';
 import { usePresenceForSystem } from './MapPresenceContext';
 import { useSignatureIndicator } from './MapSignatureIndicatorContext';
@@ -479,6 +480,7 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
   const color = systemEffectColor(effect);
   const name = systemEffectName(effect);
   const bonuses = classId != null ? systemEffectBonuses(effect, classId) : [];
+  const hoverDelays = useExperimentalHoverTriggerDelays();
 
   return (
     <PreviewCard.Root>
@@ -487,6 +489,7 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
         className="nodrag nopan ml-auto size-2.5 shrink-0 rounded-xs ring-1 ring-foreground/25"
         style={{ backgroundColor: color }}
         aria-label={`System effect: ${name}`}
+        {...hoverDelays}
       />
       <PreviewCard.Portal>
         <PreviewCard.Positioner sideOffset={4} side="bottom" align="end">
