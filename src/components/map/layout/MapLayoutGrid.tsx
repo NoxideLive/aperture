@@ -11,7 +11,7 @@ import {
   type Layout,
   type ResponsiveLayouts,
 } from 'react-grid-layout';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PANEL_BREAKPOINTS, PANEL_COLS, PANEL_MIN } from '@/lib/map/layout/panels';
 import type { Breakpoint, PanelId } from '@/types';
@@ -109,6 +109,7 @@ export function MapLayoutGrid({
   // The snapped cell a tab would tear off into. Non-null only while a tab hovers the
   // grid surface (outside any header); drives the ghost outline.
   const [ghost, setGhost] = useState<GhostCell | null>(null);
+  const lastGhostKey = useRef<string | null>(null);
 
   // Translate the live pointer (activator + accumulated delta) to a snapped grid
   // cell for the dragged panel, using the panel's `PANEL_MIN` footprint.
@@ -131,18 +132,29 @@ export function MapLayoutGrid({
     [containerRef, cols, positionParams],
   );
 
+  const setGhostCell = useCallback((cell: GhostCell | null) => {
+    const key = cell ? `${cell.x},${cell.y},${cell.w},${cell.h}` : null;
+    if (key === lastGhostKey.current) return;
+    lastGhostKey.current = key;
+    setGhost(cell);
+  }, []);
+
   useDndMonitor({
     onDragMove: (e) => {
-      setGhost(e.over?.id === GRID_DROPPABLE_ID ? pointerCell(e) : null);
+      setGhostCell(e.over?.id === GRID_DROPPABLE_ID ? pointerCell(e) : null);
     },
     onDragEnd: (e) => {
       if (e.over?.id === GRID_DROPPABLE_ID) {
         const cell = pointerCell(e);
         if (cell) onTearOff?.(e.active.id as PanelId, cell.x, cell.y);
       }
+      lastGhostKey.current = null;
       setGhost(null);
     },
-    onDragCancel: () => setGhost(null),
+    onDragCancel: () => {
+      lastGhostKey.current = null;
+      setGhost(null);
+    },
   });
 
   const ghostRect = ghost && calcGridItemPosition(positionParams, ghost.x, ghost.y, ghost.w, ghost.h);

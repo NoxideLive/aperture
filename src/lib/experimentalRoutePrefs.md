@@ -11,3 +11,12 @@ Whether mapped jump-bridge edges participate in route compute; default on. Merge
 
 ### subscribeExperimentalRoutePrefs(onChange)
 Listens for `aperture:experimental-route-prefs` on `window` after writes.
+
+### readExperimentalFightMapSystemId / writeExperimentalFightMapSystemId
+Device-local fight anchor (`ap_map_system.id`) for home→fight route shortcuts.
+
+### fightTaggedSystems(systems)
+Systems whose `tag` or `alias` matches `/fight/i`.
+
+### resolveHomeFightRouteEnds(systems, homeMapSystemId)
+Returns `{ home, fight }` map nodes — fight prefers the persisted id, else the first fight-tagged system.

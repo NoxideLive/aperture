@@ -41,9 +41,13 @@ import {
   readExperimentalCombatAlertSound,
   readExperimentalRallyDesktopNotification,
   readExperimentalRallyToast,
+  readExperimentalRouteHazardToast,
+  readExperimentalRouteOffRouteToast,
   writeExperimentalCombatAlertSound,
   writeExperimentalRallyDesktopNotification,
   writeExperimentalRallyToast,
+  writeExperimentalRouteHazardToast,
+  writeExperimentalRouteOffRouteToast,
 } from '@/lib/experimentalAlertPrefs';
 import {
   readExperimentalAutoMassFromLog,
@@ -119,6 +123,8 @@ export function AccountSettingsDialog({
   const [rallyToast, setRallyToast] = useState(readExperimentalRallyToast);
   const [rallyDesktop, setRallyDesktop] = useState(readExperimentalRallyDesktopNotification);
   const [combatSound, setCombatSound] = useState(readExperimentalCombatAlertSound);
+  const [routeOffRouteToast, setRouteOffRouteToast] = useState(readExperimentalRouteOffRouteToast);
+  const [routeHazardToast, setRouteHazardToast] = useState(readExperimentalRouteHazardToast);
   const [autoMass, setAutoMass] = useState(readExperimentalAutoMassFromLog);
   const [experimentalSettingsQuery, setExperimentalSettingsQuery] = useState('');
 
@@ -506,6 +512,30 @@ export function AccountSettingsDialog({
                     }}
                   />
                   Combat kill alert sound
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={routeOffRouteToast}
+                    onChange={(e) => {
+                      setRouteOffRouteToast(e.target.checked);
+                      writeExperimentalRouteOffRouteToast(e.target.checked);
+                    }}
+                  />
+                  Active route off-route toast
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={routeHazardToast}
+                    onChange={(e) => {
+                      setRouteHazardToast(e.target.checked);
+                      writeExperimentalRouteHazardToast(e.target.checked);
+                    }}
+                  />
+                  Active route link / EOL alert toast
                 </label>
               </div>
             ) : null}

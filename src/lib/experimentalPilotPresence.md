@@ -13,3 +13,9 @@ Tailwind utility classes tinting the compact count badge ring and text.
 
 ### pilotNameToneClass(tone: PilotStandingTone): string
 Text colour class for pilot names inside the hover card.
+
+### pilotStandingFromSystemStatus(status: SystemStatus): PilotStandingTone
+Maps an on-map `system_status` to a pilot standing tone for sidebar rows.
+
+### pilotLocationFadeOpacity(locationAt: string, nowMs: number): number
+Returns a 0.45–1 opacity for how long ago a pilot's `locationAt` was reported.

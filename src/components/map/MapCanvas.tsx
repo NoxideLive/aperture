@@ -109,6 +109,7 @@ import {
   SignatureModuleHeaderActions,
 } from '@/components/sidebar/SignatureModule';
 import {
+  Copy,
   Download,
   Info,
   LayoutDashboard,
@@ -161,6 +162,9 @@ import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { PresenceSoundBridge } from './PresenceSoundBridge';
 import { RallySoundBridge } from './RallySoundBridge';
 import { ExperimentalRallyNotify } from './ExperimentalRallyNotify';
+import { ExperimentalActiveRouteBridge } from './ExperimentalActiveRouteBridge';
+import { ExperimentalPanelGearProvider } from './experimentalPanelGear';
+import { pushKspaceWaypointsForCharacter } from '@/lib/character/pushRouteWaypoints';
 import { ExperimentalCombatRingProvider } from './ExperimentalCombatRingContext';
 import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
 import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
@@ -197,6 +201,7 @@ import {
   migrateLayout,
   removePanelFromLayout,
 } from '@/lib/map/layout/panels';
+import { parsePanelSplitDroppableId, splitPanelAdjacent } from '@/lib/map/layout/panelSplit';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
@@ -214,7 +219,16 @@ import {
   requestExperimentalPanelAdd,
   subscribeExperimentalPanelAdd,
 } from '@/lib/experimentalPanelActionBus';
-import { readExperimentalAutoMassFromLog, readKeepMapSelection } from '@/lib/experimentalQolPrefs';
+import {
+  readExperimentalAutoMassFromLog,
+  readKeepMapSelection,
+  writeKeepMapSelection,
+} from '@/lib/experimentalQolPrefs';
+import {
+  readExperimentalIncludeJumpBridge,
+  subscribeExperimentalRoutePrefs,
+  writeExperimentalIncludeJumpBridge,
+} from '@/lib/experimentalRoutePrefs';
 import { massStatusFromCumulative } from '@/lib/experimentalAutoMass';
 import { fetchWormholeJumpInfo } from '@/lib/reference/client';
 import type { WormholeJumpInfoRow } from '@/types';
@@ -495,6 +509,13 @@ export function MapCanvas({
   // direct scanner paste also removes missing sigs, then disarms itself.
   const [lazyDeleteSigs, setLazyDeleteSigs] = useState(false);
   const [sigCleanupOpen, setSigCleanupOpen] = useState(false);
+  const [panelGearJumpBridge, setPanelGearJumpBridge] = useState(readExperimentalIncludeJumpBridge);
+  const [panelGearKeepSelection, setPanelGearKeepSelection] = useState(readKeepMapSelection);
+
+  useEffect(
+    () => subscribeExperimentalRoutePrefs(() => setPanelGearJumpBridge(readExperimentalIncludeJumpBridge())),
+    [],
+  );
   const [viewData, setViewData] = useState<MapViewData>(data);
   const [liveShares, setLiveShares] = useState<LiveShareBadge[]>(initialLiveShares);
   // Captured via ReactFlow's onInit so the manual-add flow can place new nodes
@@ -1105,6 +1126,16 @@ export function MapCanvas({
   const handlePanelDrop = useCallback(
     (activePanel: PanelId, overId: string) => {
       const groupsBp = layout.groups[breakpoint] ?? [];
+      const split = parsePanelSplitDroppableId(overId);
+      if (split) {
+        setLayout((prev) => {
+          const next = splitPanelAdjacent(prev, breakpoint, activePanel, split.groupId, split.side);
+          if (next === prev) return prev;
+          saveLayout(next);
+          return next;
+        });
+        return;
+      }
       if (overId.startsWith('grp:')) {
         mergePanelIntoGroup(activePanel, overId.slice(4));
         return;
@@ -1141,6 +1172,29 @@ export function MapCanvas({
     a.click();
     URL.revokeObjectURL(url);
   }, [layout]);
+
+  const handleCopyLayout = useCallback(() => {
+    void navigator.clipboard.writeText(JSON.stringify(layout, null, 2)).then(
+      () => toast.success('Layout JSON copied'),
+      () => toast.error('Could not copy layout'),
+    );
+  }, [layout]);
+
+  const refreshActiveRouteWaypoints = useCallback(async () => {
+    if (!mapActiveRoute) return;
+    const charId = mainCharacterId ?? viewerCharacterIds[0] ?? null;
+    if (charId == null) {
+      toast.error('No character for waypoint push.');
+      return;
+    }
+    const push = await pushKspaceWaypointsForCharacter(charId, mapActiveRoute.hops);
+    if (!push.ok) {
+      toast.error(push.error);
+      return;
+    }
+    toast.success(`Waypoints refreshed (${push.pushed})`);
+    router.refresh();
+  }, [mainCharacterId, mapActiveRoute, router, viewerCharacterIds]);
 
   // Hidden picker for importing someone else's exported layout file.
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -2399,6 +2453,7 @@ export function MapCanvas({
               panelHoverLinked:
                 experimentalActive &&
                 (pilotHoverSystemId === s.id || signatureHoverFarSystemId === s.id),
+              onPanelHoverSync: experimentalActive ? setPilotHoverSystemId : undefined,
               routePathLinked:
                 experimentalActive &&
                 (routeHighlightMapSystemIds.has(s.id) || routeFocusMapSystemId === s.id),
@@ -2995,12 +3050,14 @@ export function MapCanvas({
             onPlanHighlight={experimentalActive ? onRoutePlanHighlight : undefined}
             onHopClick={experimentalActive ? focusMapSystemByEveId : undefined}
             mapRouteFavourites={experimentalActive ? mapRouteFavourites : undefined}
+            viewerCharacters={experimentalActive ? viewerCharacters : []}
             onActiveRouteSaved={
               experimentalActive ? () => router.refresh() : undefined
             }
             stats={experimentalActive ? stats : undefined}
             intel={experimentalActive ? intel : undefined}
             presence={experimentalActive ? viewData.presence : undefined}
+            homeMapSystemId={viewData.map.homeMapSystemId}
           />
         );
       case 'intel':
@@ -3039,11 +3096,27 @@ export function MapCanvas({
         return <TheraModule mapId={mapId} viewData={viewData} onBulkPaste={onBulkPaste} />;
       case 'currentRoute':
         return experimentalActive ? (
-          <CurrentRoutePanel activeRoute={mapActiveRoute} viewData={viewData} />
+          <CurrentRoutePanel
+            activeRoute={mapActiveRoute}
+            viewData={viewData}
+            onSetRoute={experimentalActive ? () => void refreshActiveRouteWaypoints() : undefined}
+          />
         ) : null;
       case 'pilots':
         return experimentalActive ? (
-          <ExperimentalPilotsPanel viewData={viewData} onHoverSystem={setPilotHoverSystemId} />
+          <ExperimentalPilotsPanel
+            viewData={viewData}
+            stats={stats}
+            linkedMapSystemId={
+              pilotHoverSystemId ??
+              (selected?.kind === 'system' ? selected.id : null)
+            }
+            onHoverSystem={setPilotHoverSystemId}
+            onSelectSystem={(id) => {
+              setSelected({ kind: 'system', id });
+              setSelectedSystemIds(new Set([id]));
+            }}
+          />
         ) : null;
       case 'kills':
         return experimentalActive ? <ExperimentalKillsPanel system={selectedSystem ?? undefined} /> : null;
@@ -3051,6 +3124,70 @@ export function MapCanvas({
         return experimentalActive ? <ExperimentalDscanPanel system={selectedSystem ?? undefined} /> : null;
     }
   };
+
+  const renderPanelGearBody = useCallback(
+    (id: PanelId): ReactNode => {
+      if (!experimentalActive) return null;
+      switch (id) {
+        case 'canvas':
+          return (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={panelGearKeepSelection}
+                onChange={(e) => {
+                  setPanelGearKeepSelection(e.target.checked);
+                  writeKeepMapSelection(e.target.checked);
+                }}
+              />
+              Keep map selection on paste
+            </label>
+          );
+        case 'signatures':
+          return (
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={lazyDeleteSigs}
+                  onChange={(e) => setLazyDeleteSigs(e.target.checked)}
+                />
+                Lazy delete on paste
+              </label>
+              <Button type="button" size="sm" variant="outline" onClick={() => setSigCleanupOpen(true)}>
+                Signature clean up…
+              </Button>
+            </div>
+          );
+        case 'route':
+          return (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={panelGearJumpBridge}
+                onChange={(e) => {
+                  setPanelGearJumpBridge(e.target.checked);
+                  writeExperimentalIncludeJumpBridge(e.target.checked);
+                }}
+              />
+              Include jump bridges
+            </label>
+          );
+        case 'pilots':
+          return (
+            <p className="text-muted-foreground">
+              Card hover uses the account <strong>Hover delay</strong> setting.
+            </p>
+          );
+        default:
+          return null;
+      }
+    },
+    [experimentalActive, lazyDeleteSigs, panelGearJumpBridge, panelGearKeepSelection],
+  );
 
   const panelHeaderRight = (id: PanelId): ReactNode => {
     if (id === 'signatures') {
@@ -3077,6 +3214,7 @@ export function MapCanvas({
     <MapStyleProvider value={mapStyleOpts}>
     <MapLinkHoverProvider>
     <MapPresenceProvider initial={data.presence} mapId={data.map.id}>
+      <ExperimentalPanelGearProvider renderGearBody={renderPanelGearBody}>
       <MapActiveCharProvider viewerCharacters={viewerCharacters} mainCharacterId={mainCharacterId}>
         <MapTravelProvider>
           <ExperimentalCombatRingProvider>
@@ -3111,6 +3249,17 @@ export function MapCanvas({
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
               {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
+              {experimentalActive ? (
+                <ExperimentalActiveRouteBridge
+                  mapId={mapId}
+                  activeRoute={mapActiveRoute ?? null}
+                  routePrefs={routePrefs}
+                  presence={viewData.presence}
+                  connections={viewData.connections}
+                  primaryCharacterId={mainCharacterId ?? viewerCharacterIds[0] ?? null}
+                  onRouteUpdated={() => router.refresh()}
+                />
+              ) : null}
               {experimentalActive ? <ExperimentalUndoHotkeys /> : null}
               {experimentalActive ? (
                 <ExperimentalCombatSoundBridge mapId={mapId} systems={viewData.systems} />
@@ -3196,6 +3345,12 @@ export function MapCanvas({
                             <MenuSeparator />
                           </>
                         ) : null}
+                        <MenuItem
+                          icon={<Copy className="size-3.5" />}
+                          onClick={handleCopyLayout}
+                        >
+                          Copy layout JSON
+                        </MenuItem>
                         <MenuItem
                           icon={<Download className="size-3.5" />}
                           onClick={handleExportLayout}
@@ -3342,6 +3497,7 @@ export function MapCanvas({
           </ExperimentalCombatRingProvider>
         </MapTravelProvider>
       </MapActiveCharProvider>
+      </ExperimentalPanelGearProvider>
     </MapPresenceProvider>
     </MapLinkHoverProvider>
     </MapStyleProvider>

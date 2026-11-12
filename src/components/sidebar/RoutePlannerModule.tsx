@@ -15,6 +15,15 @@ import { ChevronRight, Copy, Loader2, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -46,8 +55,10 @@ import { subscribeRouteDestinations } from '@/lib/map/routeDestinationBus';
 import {
   readExperimentalExitOrigin,
   readExperimentalIncludeJumpBridge,
+  resolveHomeFightRouteEnds,
   subscribeExperimentalRoutePrefs,
   writeExperimentalExitOrigin,
+  writeExperimentalFightMapSystemId,
   writeExperimentalIncludeJumpBridge,
   type ExperimentalExitOrigin,
 } from '@/lib/experimentalRoutePrefs';
@@ -142,14 +153,17 @@ export function RoutePlannerModule({
   onPlanHighlight,
   mapRouteFavourites,
   activeCharacterId,
+  viewerCharacters = [],
   onActiveRouteSaved,
   onHopClick,
   stats = {},
   intel = {},
   presence = [],
+  homeMapSystemId = null,
 }: {
   mapId: string;
   selectedSystemId: number | null;
+  homeMapSystemId?: string | null;
   initialPrefs: RoutePrefs;
   initialDestinations: RouteDestinationView[];
   systems: MapSystemNode[];
@@ -162,6 +176,8 @@ export function RoutePlannerModule({
   /** Experimental: per-map pinned favourites (personal + shared). */
   mapRouteFavourites?: MapRouteFavouriteView[];
   activeCharacterId?: number | null;
+  /** Account characters available as route followers when setting an active route. */
+  viewerCharacters?: { id: number; name: string }[];
   onActiveRouteSaved?: () => void;
   stats?: Record<number, SystemStatsSummary>;
   intel?: Record<number, SystemIntelSummary>;
@@ -187,6 +203,8 @@ export function RoutePlannerModule({
   const [favourites, setFavourites] = useState<MapRouteFavouriteView[]>(
     () => mapRouteFavourites ?? [],
   );
+  const [setRoutePlan, setSetRoutePlan] = useState<RoutePlan | null>(null);
+  const [followerPick, setFollowerPick] = useState<ReadonlySet<number>>(() => new Set());
   const [, startPrefs] = useTransition();
 
   const routeSource = useSyncExternalStore(
@@ -439,6 +457,21 @@ export function RoutePlannerModule({
     await addDestinationByEveId(pick.systemId, pick.alias?.trim() || pick.name);
   }, [addDestinationByEveId, systems]);
 
+  const addHomeFightRoute = useCallback(async () => {
+    const { home, fight } = resolveHomeFightRouteEnds(systems, homeMapSystemId);
+    if (!home) {
+      toast.error('Set a Home system on the map first.');
+      return;
+    }
+    if (!fight) {
+      toast.error('Tag a fight system (tag/alias “fight”) or pick one in route prefs.');
+      return;
+    }
+    writeExperimentalFightMapSystemId(fight.id);
+    await addDestinationByEveId(home.systemId, `Home · ${home.alias?.trim() || home.name}`);
+    await addDestinationByEveId(fight.systemId, `Fight · ${fight.alias?.trim() || fight.name}`);
+  }, [addDestinationByEveId, systems, homeMapSystemId]);
+
   const removeDestination = useCallback(async (id: number) => {
     setDestinations((prev) => prev.filter((d) => d.id !== id));
     await removeRouteDestinationAction(id);
@@ -511,34 +544,75 @@ export function RoutePlannerModule({
     [mapId],
   );
 
-  const setActiveForPlan = useCallback(
-    async (plan: RoutePlan) => {
+  const beginSetActiveRoute = useCallback(
+    (plan: RoutePlan) => {
       const charId = activeCharacterId ?? activeCharId;
       if (!charId) {
         toast.error('Pick an active character first.');
         return;
       }
-      const push = await pushKspaceWaypointsForCharacter(charId, plan.hops);
-      if (!push.ok) {
-        toast.error(push.error);
-        return;
-      }
-      const saved = await setMapActiveRouteAction({
-        mapId,
-        primaryCharacterId: charId,
-        destinationSystemId: plan.destinationSystemId,
-        plan,
-        followerCharacterIds: [charId],
-      });
-      if (!saved.ok) {
-        toast.error(saved.error);
-        return;
-      }
-      toast.success(`Active route set (${push.pushed} waypoint${push.pushed === 1 ? '' : 's'} pushed)`);
-      onActiveRouteSaved?.();
+      const defaultFollowers =
+        viewerCharacters.length > 0
+          ? viewerCharacters.map((c) => c.id)
+          : [charId];
+      setFollowerPick(new Set(defaultFollowers));
+      setSetRoutePlan(plan);
     },
-    [activeCharacterId, activeCharId, mapId, onActiveRouteSaved],
+    [activeCharacterId, activeCharId, viewerCharacters],
   );
+
+  const commitSetActiveRoute = useCallback(async () => {
+    const plan = setRoutePlan;
+    if (!plan) return;
+    const charId = activeCharacterId ?? activeCharId;
+    if (!charId) {
+      toast.error('Pick an active character first.');
+      return;
+    }
+    const followerCharacterIds = [...followerPick];
+    if (!followerCharacterIds.includes(charId)) {
+      followerCharacterIds.unshift(charId);
+    }
+    if (followerCharacterIds.length === 0) {
+      toast.error('Select at least one follower.');
+      return;
+    }
+    const push = await pushKspaceWaypointsForCharacter(charId, plan.hops);
+    if (!push.ok) {
+      toast.error(push.error);
+      return;
+    }
+    const saved = await setMapActiveRouteAction({
+      mapId,
+      primaryCharacterId: charId,
+      destinationSystemId: plan.destinationSystemId,
+      plan,
+      followerCharacterIds,
+    });
+    if (!saved.ok) {
+      toast.error(saved.error);
+      return;
+    }
+    setSetRoutePlan(null);
+    toast.success(`Active route set (${push.pushed} waypoint${push.pushed === 1 ? '' : 's'} pushed)`);
+    onActiveRouteSaved?.();
+  }, [
+    activeCharacterId,
+    activeCharId,
+    followerPick,
+    mapId,
+    onActiveRouteSaved,
+    setRoutePlan,
+  ]);
+
+  const toggleFollowerPick = useCallback((id: number) => {
+    setFollowerPick((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   return (
     <Card size="sm">
@@ -768,7 +842,7 @@ export function RoutePlannerModule({
                   onPlanHighlight && planBySystem.get(dest.systemId)?.reachable
                     ? () => {
                         const plan = planBySystem.get(dest.systemId);
-                        if (plan?.reachable) void setActiveForPlan(plan);
+                        if (plan?.reachable) beginSetActiveRoute(plan);
                       }
                     : undefined
                 }
@@ -810,6 +884,40 @@ export function RoutePlannerModule({
           ) : null}
         </div>
       </CardContent>
+      <Dialog open={setRoutePlan != null} onOpenChange={(open) => !open && setSetRoutePlan(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set active route</DialogTitle>
+            <DialogDescription>
+              Push k-space waypoints for the active character and track followers on this device.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-1">
+            {(viewerCharacters.length > 0 ? viewerCharacters : followerPick.size > 0
+              ? [...followerPick].map((id) => ({ id, name: `Character ${id}` }))
+              : []
+            ).map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={followerPick.has(c.id)}
+                  onChange={() => toggleFollowerPick(c.id)}
+                />
+                {c.name}
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setSetRoutePlan(null)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void commitSetActiveRoute()}>
+              Set route
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

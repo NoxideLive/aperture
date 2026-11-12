@@ -6,6 +6,8 @@ const RALLY_TOAST_KEY = 'aperture:experimental:alert-rally-toast';
 const RALLY_DESKTOP_KEY = 'aperture:experimental:alert-rally-desktop';
 const COMBAT_SOUND_KEY = 'aperture:experimental:alert-combat-sound';
 const COMBAT_DESKTOP_KEY = 'aperture:experimental:alert-combat-desktop';
+const ROUTE_OFFROUTE_KEY = 'aperture:experimental:alert-route-offroute-toast';
+const ROUTE_HAZARD_KEY = 'aperture:experimental:alert-route-hazard-toast';
 
 export const EXPERIMENTAL_ALERT_EVT = 'aperture:experimental-alert-prefs';
 
@@ -67,4 +69,22 @@ export function readExperimentalCombatAlertDesktop(): boolean {
 export function writeExperimentalCombatAlertDesktop(on: boolean): void {
   if (!isExperimentalUiActive(readExperimentalUiFromHtml())) return;
   writeFlag(COMBAT_DESKTOP_KEY, on);
+}
+
+export function readExperimentalRouteOffRouteToast(): boolean {
+  return experimentalOnly(() => readFlag(ROUTE_OFFROUTE_KEY), false);
+}
+
+export function writeExperimentalRouteOffRouteToast(on: boolean): void {
+  if (!isExperimentalUiActive(readExperimentalUiFromHtml())) return;
+  writeFlag(ROUTE_OFFROUTE_KEY, on);
+}
+
+export function readExperimentalRouteHazardToast(): boolean {
+  return experimentalOnly(() => readFlag(ROUTE_HAZARD_KEY), false);
+}
+
+export function writeExperimentalRouteHazardToast(on: boolean): void {
+  if (!isExperimentalUiActive(readExperimentalUiFromHtml())) return;
+  writeFlag(ROUTE_HAZARD_KEY, on);
 }

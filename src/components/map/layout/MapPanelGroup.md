@@ -17,7 +17,7 @@
 | onExperimentalCollapseChange | (groupId: string, collapsed: boolean) => void | no | Experimental only: notifies the parent to shrink or restore the group's RGL height (not persisted) |
 
 ### Renders
-A full-height `Card` (`gap-0 py-0`) with a thin header bar and a body. The header holds a grip icon then a horizontal tab strip (one draggable tab per visible member: title button + a close ✕ when the group has more than one member, active tab highlighted), followed by the active member's `renderHeaderRight` and — only in the single-member case — a whole-panel hide (✕) button. The body renders `renderContent(active)`.
+A full-height `Card` (`gap-0 py-0`) with a thin header bar and a body. The header holds a grip icon then a horizontal tab strip (one draggable tab per visible member: title button + a close ✕ when the group has more than one member, active tab highlighted), followed by an experimental `ExperimentalPanelGear` control when supported, then the active member's `renderHeaderRight` and — only in the single-member case — a whole-panel hide (✕) button. The body renders `renderContent(active)`.
 
 ### Behaviour & Interactions
 - The active member is `group.active` when it is still visible, else the first visible member.

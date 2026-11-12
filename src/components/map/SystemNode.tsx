@@ -67,6 +67,8 @@ export type SystemNodeData = MapSystemNode & {
   hasIncursion?: boolean;
   /** Experimental: sidebar panel row is hovering this system. */
   panelHoverLinked?: boolean;
+  /** Experimental: sync pilots-panel highlight when the tile is hovered. */
+  onPanelHoverSync?: (mapSystemId: string | null) => void;
   /** Experimental: active route path or hop focus on the map. */
   routePathLinked?: boolean;
 };
@@ -154,6 +156,16 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
       ]
         .filter(Boolean)
         .join(' ')}
+      onMouseEnter={
+        experimentalUi && data.onPanelHoverSync
+          ? () => data.onPanelHoverSync?.(data.id)
+          : undefined
+      }
+      onMouseLeave={
+        experimentalUi && data.onPanelHoverSync
+          ? () => data.onPanelHoverSync?.(null)
+          : undefined
+      }
       style={{
         borderLeft: `4px solid ${classColor}`,
         // Selected tiles get a prominent halo in their status colour: a solid

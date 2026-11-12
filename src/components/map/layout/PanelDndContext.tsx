@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { type ReactNode, useState } from 'react';
 
-import { PANELS } from '@/lib/map/layout/panels';
+import { PANEL_MIN, PANELS } from '@/lib/map/layout/panels';
 import type { PanelId } from '@/types';
 
 import { GRID_DROPPABLE_ID } from './MapLayoutGrid';
@@ -71,10 +71,13 @@ export function PanelDndContext({ onDragEnd, children }: PanelDndContextProps) {
       }}
     >
       {children}
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {activePanel ? (
-          <div className="ap-panel-dnd-ghost rounded-lg border-2 border-primary bg-popover px-4 py-2 font-heading text-base shadow-xl ring-4 ring-primary/20">
-            {PANEL_TITLES[activePanel]}
+          <div className="ap-panel-dnd-ghost flex min-w-[8rem] flex-col gap-0.5 rounded-lg border-2 border-primary bg-popover px-4 py-2 font-heading text-base shadow-xl ring-4 ring-primary/20">
+            <span>{PANEL_TITLES[activePanel]}</span>
+            <span className="text-[10px] font-normal text-muted-foreground">
+              min {PANEL_MIN[activePanel].minW}×{PANEL_MIN[activePanel].minH}
+            </span>
           </div>
         ) : null}
       </DragOverlay>

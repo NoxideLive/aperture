@@ -17,6 +17,8 @@
 | onPlanHighlight | (plan: RoutePlan \| null) => void | no | Experimental: pushes the highlighted plan to `MapCanvas` for edge/system glow. |
 | onHopClick | (eveSystemId: number) => void | no | Experimental: pan/zoom to an on-map hop via `MapCanvas`. |
 | mapRouteFavourites | MapRouteFavouriteView[] | no | Experimental per-map favourites. |
+| activeCharacterId | number \| null | no | Primary character for ESI waypoint push. |
+| viewerCharacters | { id, name }[] | no | Follower picker when **Set route** is confirmed. |
 | stats / intel / presence | maps / arrays | no | Experimental analysis panel inputs. |
 
 ### Renders
