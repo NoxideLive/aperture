@@ -188,7 +188,7 @@ import { MapStyleProvider } from './MapStyleContext';
 import { MapLinkHoverProvider } from './MapLinkHoverContext';
 import { homePathConnectionIds } from '@/lib/map/homePath';
 import type { MapStyleOptions } from './styling';
-import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
+import { MapLayoutGrid } from './layout/MapLayoutGrid';
 import { MapPanelGroup } from './layout/MapPanelGroup';
 import { PanelDndContext } from './layout/PanelDndContext';
 import {
@@ -868,56 +868,6 @@ export function MapCanvas({
     },
     [saveLayout],
   );
-
-  // Experimental: grow grid rows to fit panel content without persisting heights.
-  useEffect(() => {
-    if (!experimentalActive) return;
-    const measure = () => {
-      const bp = breakpoint;
-      const panels = document.querySelectorAll<HTMLElement>('[data-layout-item-id]');
-      if (panels.length === 0) return;
-      const heightByItem = new Map<string, number>();
-      for (const el of panels) {
-        const layoutId = el.getAttribute('data-layout-item-id');
-        const panelId = el.getAttribute('data-panel-id');
-        if (!layoutId || panelId === 'canvas') continue;
-        if (experimentalCollapsedGroups.has(layoutId)) continue;
-        const measured = el.scrollHeight + 16;
-        const minH = PANEL_MIN[panelId as PanelId]?.minH ?? 2;
-        const rows = Math.max(minH, Math.ceil(measured / MAP_LAYOUT_ROW_HEIGHT));
-        const prev = heightByItem.get(layoutId) ?? 0;
-        heightByItem.set(layoutId, Math.max(prev, rows));
-      }
-      if (heightByItem.size === 0) return;
-      setLayout((prev) => {
-        const items = prev.layouts[bp] ?? [];
-        let changed = false;
-        const nextItems = items.map((item) => {
-          const rows = heightByItem.get(item.i);
-          if (rows == null || rows === item.h) return item;
-          changed = true;
-          return { ...item, h: rows };
-        });
-        if (!changed) return prev;
-        layoutPersistSkipRef.current = true;
-        return { ...prev, layouts: { ...prev.layouts, [bp]: nextItems } };
-      });
-    };
-    const ro = new ResizeObserver(() => requestAnimationFrame(measure));
-    const nodes = () => document.querySelectorAll<HTMLElement>('[data-layout-item-id]');
-    const wire = () => {
-      ro.disconnect();
-      for (const n of nodes()) ro.observe(n);
-      measure();
-    };
-    wire();
-    const mo = new MutationObserver(() => wire());
-    mo.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      ro.disconnect();
-      mo.disconnect();
-    };
-  }, [experimentalActive, breakpoint, experimentalCollapsedGroups]);
 
   // Hide a panel (tab ✕ or panels-menu uncheck). The panel leaves its group's
   // tab strip in every breakpoint (`removePanelFromLayout` re-keys/drops the

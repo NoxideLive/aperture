@@ -126,11 +126,11 @@ export const DEFAULT_MAP_LAYOUT: MapLayoutConfig = {
 type ExperimentalRightGroup = { id: PanelId; anchor: PanelId; h: number };
 
 const EXPERIMENTAL_RIGHT_STACK: ExperimentalRightGroup[] = [
-  { id: 'inspector', anchor: 'inspector', h: 5 },
-  { id: 'route', anchor: 'route', h: 4 },
-  { id: 'pilots', anchor: 'pilots', h: 4 },
-  { id: 'thera', anchor: 'thera', h: 4 },
-  { id: 'systemGraph', anchor: 'systemGraph', h: 4 },
+  { id: 'inspector', anchor: 'inspector', h: 3 },
+  { id: 'route', anchor: 'route', h: 2 },
+  { id: 'pilots', anchor: 'pilots', h: 2 },
+  { id: 'thera', anchor: 'thera', h: 2 },
+  { id: 'systemGraph', anchor: 'systemGraph', h: 3 },
   { id: 'structure', anchor: 'structure', h: 2 },
 ];
 
@@ -152,8 +152,8 @@ function experimentalWideLayout(cols: number) {
     return item;
   });
   return [
-    { i: 'canvas' as PanelId, x: 0, y: 0, w: leftW, h: 14, ...PANEL_MIN.canvas },
-    { i: 'signatures' as PanelId, x: 0, y: 14, w: leftW, h: 8, ...PANEL_MIN.signatures },
+    { i: 'canvas' as PanelId, x: 0, y: 0, w: leftW, h: 10, ...PANEL_MIN.canvas },
+    { i: 'signatures' as PanelId, x: 0, y: 10, w: leftW, h: 4, ...PANEL_MIN.signatures },
     ...rightCells,
   ];
 }

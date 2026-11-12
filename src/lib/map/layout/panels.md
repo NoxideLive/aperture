@@ -24,7 +24,7 @@
 `MapLayoutConfig` — the fallback used when `ap_user.map_layout` is NULL and experimental UI is off. The built-in fixed layout: a tall `canvas` top-left, full-width `signatures` beneath it, and the info modules stacked in a right column. Built per breakpoint — `lg`/`md` via `wideLayout(cols)` (left canvas+signatures, right module stack), `sm` via a single-column stack in registry order. `groups` holds one singleton group per layout item (`id === its PanelId`); `hidden: []`.
 
 ### EXPERIMENTAL_DEFAULT_MAP_LAYOUT
-`MapLayoutConfig` — the fallback when `ap_user.map_layout` is NULL **and** experimental UI is on. Left column: tall `canvas` + taller `signatures`. Right column: stacked tab groups — Inspector+Intel; Routes; Killboard+Kill stats; Eve-Scout+Signature Search; System graph+Tags; Structures.
+`MapLayoutConfig` — the fallback when `ap_user.map_layout` is NULL **and** experimental UI is on. Left column: `canvas` (most of the height) with `signatures` beneath. Right column: compact stacked tab groups sized to fit a desktop viewport — Inspector+Intel; Route+Current Route; Pilots+Kills; Eve-Scout+D-Scan; System graph+System Killboard+Tags; Structures. Panel bodies scroll inside their grid cells.
 
 ### defaultMapLayoutForUi(experimental: boolean): MapLayoutConfig
 Returns `EXPERIMENTAL_DEFAULT_MAP_LAYOUT` when `experimental` is true, else `DEFAULT_MAP_LAYOUT`.

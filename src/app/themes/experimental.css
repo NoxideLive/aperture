@@ -83,23 +83,19 @@
 }
 
 [data-ui="experimental"] .ap-map-dashboard {
-  min-height: min(100%, 100vh);
-  overflow: visible;
-}
-
-[data-ui="experimental"] .ap-map-dashboard .react-grid-layout {
-  overflow: visible !important;
+  min-height: 0;
+  overflow: hidden;
 }
 
 [data-ui="experimental"] .ap-map-panel-body {
-  overflow: visible !important;
-  min-height: fit-content;
+  overflow: auto;
+  min-height: 0;
 }
 
 [data-ui="experimental"] .ap-signature-table-scroll {
-  overflow: visible !important;
-  flex: none;
-  min-height: fit-content;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 [data-ui="experimental"] .ap-signature-sticky-chrome {

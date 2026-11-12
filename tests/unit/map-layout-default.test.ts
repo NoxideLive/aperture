@@ -22,7 +22,7 @@ describe('defaultMapLayoutForUi', () => {
     expect(route?.members).toContain('currentRoute');
     const thera = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'thera');
     expect(thera?.members).toContain('dscan');
-    expect(EXPERIMENTAL_DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(8);
+    expect(EXPERIMENTAL_DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(4);
     expect(DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(6);
   });
 });
