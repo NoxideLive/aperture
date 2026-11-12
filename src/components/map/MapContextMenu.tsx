@@ -47,6 +47,7 @@ import { cn } from '@/lib/utils';
 import { SetDestinationItem } from './SetDestinationItem';
 import { WatchConnectionItem } from './WatchConnectionItem';
 import { AddToRoutesItem } from './AddToRoutesItem';
+import { RouteHereItem } from './RouteHereItem';
 
 /** Sentinel radio value for "jump mass unknown" — mirrors `InspectorModule.tsx`. */
 const NONE_JUMP_MASS = '__none__';
@@ -509,6 +510,8 @@ function SystemItems({
       <SetDestinationItem system={system} onClose={onClose} />
 
       <AddToRoutesItem system={system} onClose={onClose} />
+
+      <RouteHereItem system={system} onClose={onClose} />
 
       <MenuSubmenu>
         <MenuSubmenuTrigger inset>Status</MenuSubmenuTrigger>

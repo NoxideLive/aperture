@@ -109,6 +109,31 @@
   background: var(--card);
 }
 
+[data-ui="experimental"] tr.ap-sig-age-warm {
+  background: color-mix(in oklab, var(--card) 88%, #f59e0b 12%);
+}
+
+[data-ui="experimental"] tr.ap-sig-age-stale {
+  background: color-mix(in oklab, var(--card) 82%, var(--muted-foreground) 18%);
+  color: color-mix(in oklab, var(--foreground) 78%, var(--muted-foreground));
+}
+
+[data-ui="experimental"] tr[class*='ap-sig-wh-dest-'] {
+  box-shadow: inset 3px 0 0 0 var(--ap-sig-wh-accent, transparent);
+}
+
+[data-ui="experimental"] tr.ap-sig-wh-dest-h { --ap-sig-wh-accent: #3ddc97; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-l { --ap-sig-wh-accent: #f0a04b; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-n { --ap-sig-wh-accent: #f07167; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-p { --ap-sig-wh-accent: #e85d8c; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-a { --ap-sig-wh-accent: #2dd4c8; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c1 { --ap-sig-wh-accent: #5ec8ff; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c2 { --ap-sig-wh-accent: #3ba3f0; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c3 { --ap-sig-wh-accent: #c5d63a; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c4 { --ap-sig-wh-accent: #f5c518; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c5 { --ap-sig-wh-accent: #ff8a3d; }
+[data-ui="experimental"] tr.ap-sig-wh-dest-c6 { --ap-sig-wh-accent: #e85a2c; }
+
 /* Chrome density & typography (experimental only). */
 [data-ui="experimental"] header > .flex {
   height: 2.75rem;
@@ -234,6 +259,13 @@
   outline: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
   outline-offset: 3px;
   filter: brightness(1.08);
+}
+
+[data-ui='experimental'] .react-flow__node.ap-route-path-linked .group {
+  outline: 2px solid #22d3ee;
+  outline-offset: 3px;
+  filter: brightness(1.06);
+  box-shadow: 0 0 12px color-mix(in srgb, #22d3ee 45%, transparent);
 }
 
 [data-ui='experimental'] .ap-pilot-hover-card.ap-pilot-standing-friendly {

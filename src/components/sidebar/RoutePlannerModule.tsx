@@ -1,6 +1,6 @@
 'use client';
 
-import {
+import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -43,6 +43,23 @@ import { subscribeExperimentalPanelAdd } from '@/lib/experimentalPanelActionBus'
 import { setMapActiveRouteAction } from '@/app/(app)/actions/mapActiveRoute';
 import { pushKspaceWaypointsForCharacter } from '@/lib/character/pushRouteWaypoints';
 import { subscribeRouteDestinations } from '@/lib/map/routeDestinationBus';
+import {
+  readExperimentalExitOrigin,
+  readExperimentalIncludeJumpBridge,
+  subscribeExperimentalRoutePrefs,
+  writeExperimentalExitOrigin,
+  writeExperimentalIncludeJumpBridge,
+  type ExperimentalExitOrigin,
+} from '@/lib/experimentalRoutePrefs';
+import {
+  JITA_SYSTEM_ID,
+  pickPrimaryChainExit,
+  stagingTaggedSystems,
+  THERA_SYSTEM_ID,
+  topChainExitsForCompare,
+  TURNUR_SYSTEM_ID,
+} from '@/lib/map/experimentalRouteExit';
+import { summarizeRoutePlan } from '@/lib/map/experimentalRouteAnalysis';
 import type {
   MapConnectionEdge,
   MapSignature,
@@ -54,7 +71,10 @@ import type {
   RoutePrefs,
   RouteSafety,
   MapRouteFavouriteView,
+  MapPresenceEntry,
+  SystemIntelSummary,
   SystemSearchResult,
+  SystemStatsSummary,
   WhJumpMass,
 } from '@/types';
 
@@ -123,6 +143,10 @@ export function RoutePlannerModule({
   mapRouteFavourites,
   activeCharacterId,
   onActiveRouteSaved,
+  onHopClick,
+  stats = {},
+  intel = {},
+  presence = [],
 }: {
   mapId: string;
   selectedSystemId: number | null;
@@ -133,10 +157,15 @@ export function RoutePlannerModule({
   signatures: MapSignature[];
   /** Experimental: highlight the first reachable plan on the map canvas. */
   onPlanHighlight?: (plan: RoutePlan | null) => void;
+  /** Experimental: pan/zoom + highlight an on-map hop.systemId (EVE id). */
+  onHopClick?: (eveSystemId: number) => void;
   /** Experimental: per-map pinned favourites (personal + shared). */
   mapRouteFavourites?: MapRouteFavouriteView[];
   activeCharacterId?: number | null;
   onActiveRouteSaved?: () => void;
+  stats?: Record<number, SystemStatsSummary>;
+  intel?: Record<number, SystemIntelSummary>;
+  presence?: MapPresenceEntry[];
 }) {
   const { activeCharSystemId, activeCharId } = useMapActiveChar();
 
@@ -149,6 +178,12 @@ export function RoutePlannerModule({
   const [plans, setPlans] = useState<RoutePlan[]>([]);
   const [computing, setComputing] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<ReadonlySet<number>>(() => new Set());
+  const [analysisDestId, setAnalysisDestId] = useState<number | null>(null);
+  const [exitComparePlans, setExitComparePlans] = useState<
+    { originSystemId: number; originName: string; plan: RoutePlan }[]
+  >([]);
+  const [exitCompareBusy, setExitCompareBusy] = useState(false);
+  const [highlightedPlan, setHighlightedPlan] = useState<RoutePlan | null>(null);
   const [favourites, setFavourites] = useState<MapRouteFavouriteView[]>(
     () => mapRouteFavourites ?? [],
   );
@@ -160,14 +195,51 @@ export function RoutePlannerModule({
     serverRouteSource,
   );
 
+  const experimentalRoutes = onPlanHighlight != null;
+
+  const exitOrigin = useSyncExternalStore(
+    subscribeExperimentalRoutePrefs,
+    readExperimentalExitOrigin,
+    () => 'chain' as ExperimentalExitOrigin,
+  );
+
+  const includeJumpBridge = useSyncExternalStore(
+    subscribeExperimentalRoutePrefs,
+    readExperimentalIncludeJumpBridge,
+    () => true,
+  );
+
   const setRouteSource = useCallback((v: RouteSource) => {
     writeRouteSource(v);
   }, []);
+
+  const chainExit = useMemo(
+    () => (experimentalRoutes ? pickPrimaryChainExit(systems, connections) : null),
+    [experimentalRoutes, systems, connections],
+  );
 
   const sourceSystemId =
     routeSource === 'character'
       ? (activeCharSystemId ?? manualSource?.id ?? null)
       : selectedSystemId;
+
+  const exitCompareOrigins = useMemo(() => {
+    if (!experimentalRoutes) return [];
+    if (exitOrigin === 'selected') {
+      if (selectedSystemId == null) return [];
+      const row = systems.find((s) => s.systemId === selectedSystemId);
+      return row ? [row] : [];
+    }
+    return topChainExitsForCompare(systems, connections, 3);
+  }, [experimentalRoutes, exitOrigin, selectedSystemId, systems, connections]);
+
+  const computePrefs = useMemo(
+    (): RoutePrefs => ({
+      ...prefs,
+      includeJumpBridge: experimentalRoutes ? includeJumpBridge : prefs.includeJumpBridge,
+    }),
+    [prefs, includeJumpBridge, experimentalRoutes],
+  );
 
   // Recompute key: any change to source / prefs / destinations / the chain.
   const connectionsKey = useMemo(
@@ -202,11 +274,12 @@ export function RoutePlannerModule({
     [systems],
   );
   const destKey = useMemo(() => destinations.map((d) => d.systemId).join(','), [destinations]);
-  const prefsKey = useMemo(() => JSON.stringify(prefs), [prefs]);
+  const prefsKey = useMemo(() => JSON.stringify(computePrefs), [computePrefs]);
 
   // All state writes happen inside the timer callback (not the effect body) to
   // honour the no-synchronous-setState-in-effect rule (same as AddSystemDialog).
   const computeSeq = useRef(0);
+  const exitCompareSeq = useRef(0);
   useEffect(() => {
     const seq = ++computeSeq.current;
     const noWork = sourceSystemId == null || destinations.length === 0;
@@ -223,10 +296,15 @@ export function RoutePlannerModule({
       >('POST', `/api/map/${mapId}/route-plan`, {
         sourceSystemId,
         destinationSystemIds: destinations.map((d) => d.systemId),
-        prefs,
+        prefs: computePrefs,
       });
       if (seq !== computeSeq.current) return;
-      setPlans(result.ok ? result.data : []);
+      if (result.ok) {
+        setPlans(result.data);
+      } else {
+        setPlans([]);
+        toast.error('error' in result ? result.error : 'Could not compute routes.');
+      }
       setComputing(false);
     }, noWork ? 0 : COMPUTE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -237,9 +315,66 @@ export function RoutePlannerModule({
 
   useEffect(() => {
     if (!onPlanHighlight) return;
+    if (highlightedPlan?.reachable) {
+      onPlanHighlight(highlightedPlan);
+      return;
+    }
     const first = plans.find((p) => p.reachable);
     onPlanHighlight(first ?? null);
-  }, [plans, onPlanHighlight]);
+  }, [plans, onPlanHighlight, highlightedPlan]);
+
+  const compareDestId = destinations[0]?.systemId ?? null;
+
+  useEffect(() => {
+    if (!experimentalRoutes || compareDestId == null || exitCompareOrigins.length < 2) {
+      setExitComparePlans([]);
+      setExitCompareBusy(false);
+      return;
+    }
+    const seq = ++exitCompareSeq.current;
+    const timer = setTimeout(async () => {
+      setExitCompareBusy(true);
+      const rows: { originSystemId: number; originName: string; plan: RoutePlan }[] = [];
+      for (const origin of exitCompareOrigins) {
+        const result = await requestJson<
+          { ok: true; data: RoutePlan[] } | { ok: false; error: string }
+        >('POST', `/api/map/${mapId}/route-plan`, {
+          sourceSystemId: origin.systemId,
+          destinationSystemIds: [compareDestId],
+          prefs: computePrefs,
+        });
+        if (seq !== exitCompareSeq.current) return;
+        if (!result.ok) continue;
+        const plan = result.data[0];
+        if (plan) {
+          rows.push({
+            originSystemId: origin.systemId,
+            originName: origin.alias?.trim() || origin.name,
+            plan,
+          });
+        }
+      }
+      if (seq !== exitCompareSeq.current) return;
+      rows.sort((a, b) => {
+        const aj = a.plan.reachable ? a.plan.jumps : Number.POSITIVE_INFINITY;
+        const bj = b.plan.reachable ? b.plan.jumps : Number.POSITIVE_INFINITY;
+        return aj - bj || a.originName.localeCompare(b.originName);
+      });
+      setExitComparePlans(rows);
+      setExitCompareBusy(false);
+    }, COMPUTE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    experimentalRoutes,
+    compareDestId,
+    exitCompareOrigins,
+    mapId,
+    computePrefs,
+    prefsKey,
+    connectionsKey,
+    signaturesKey,
+    tagsKey,
+  ]);
 
   const updatePrefs = useCallback(
     (patch: Partial<RoutePrefs>) => {
@@ -255,11 +390,54 @@ export function RoutePlannerModule({
 
   const addDestination = useCallback(async (system: SystemSearchResult) => {
     const result = await addRouteDestinationAction({ systemId: system.id });
-    if (!result.ok) return;
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
     setDestinations((prev) =>
       prev.some((d) => d.systemId === result.data.systemId) ? prev : [...prev, result.data],
     );
   }, []);
+
+  const addDestinationByEveId = useCallback(
+    async (systemId: number, label: string) => {
+      const result = await addRouteDestinationAction({ systemId, label });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setDestinations((prev) =>
+        prev.some((d) => d.systemId === result.data.systemId) ? prev : [...prev, result.data],
+      );
+      toast.success(`Destination: ${label}`);
+    },
+    [],
+  );
+
+  const addNearestHighsec = useCallback(async () => {
+    if (sourceSystemId == null) {
+      toast.error('Set a start system first.');
+      return;
+    }
+    const result = await requestJson<
+      { ok: true; data: { systemId: number } } | { ok: false; error: string }
+    >('GET', `/api/map/${mapId}/route-shortcut?from=${sourceSystemId}&kind=nearest_highsec`);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    await addDestinationByEveId(result.data.systemId, 'Nearest high-sec');
+  }, [addDestinationByEveId, mapId, sourceSystemId]);
+
+  const addStagingDestination = useCallback(async () => {
+    const tagged = stagingTaggedSystems(systems);
+    if (tagged.length === 0) {
+      toast.error('No staging-tagged systems on this map.');
+      return;
+    }
+    const pick = tagged[0]!;
+    await addDestinationByEveId(pick.systemId, pick.alias?.trim() || pick.name);
+  }, [addDestinationByEveId, systems]);
 
   const removeDestination = useCallback(async (id: number) => {
     setDestinations((prev) => prev.filter((d) => d.id !== id));
@@ -475,6 +653,84 @@ export function RoutePlannerModule({
             </ToggleChip>
         </div>
 
+        {experimentalRoutes ? (
+          <div className="flex flex-col gap-2 rounded-md border border-dashed border-border/50 p-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Experimental exits
+            </span>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-muted-foreground">Exit origin</span>
+              <ToggleChip
+                active={exitOrigin === 'chain'}
+                onClick={() => writeExperimentalExitOrigin('chain')}
+              >
+                Chain exit
+                {chainExit ? ` (${chainExit.alias?.trim() || chainExit.name})` : ''}
+              </ToggleChip>
+              <ToggleChip
+                active={exitOrigin === 'selected'}
+                onClick={() => writeExperimentalExitOrigin('selected')}
+              >
+                Selected
+              </ToggleChip>
+            </div>
+            <ToggleChip
+              active={includeJumpBridge}
+              onClick={() => writeExperimentalIncludeJumpBridge(!includeJumpBridge)}
+            >
+              Jump bridges
+            </ToggleChip>
+            <div className="flex flex-wrap gap-1">
+              <ShortcutChip onClick={() => void addNearestHighsec()}>Nearest HS</ShortcutChip>
+              <ShortcutChip
+                onClick={() => void addDestinationByEveId(JITA_SYSTEM_ID, 'Jita')}
+              >
+                Jita
+              </ShortcutChip>
+              <ShortcutChip onClick={() => void addStagingDestination()}>Staging</ShortcutChip>
+              <ShortcutChip
+                onClick={() => void addDestinationByEveId(THERA_SYSTEM_ID, 'Thera')}
+              >
+                Thera
+              </ShortcutChip>
+              <ShortcutChip
+                onClick={() => void addDestinationByEveId(TURNUR_SYSTEM_ID, 'Turnur')}
+              >
+                Turnur
+              </ShortcutChip>
+            </div>
+            {compareDestId != null && exitCompareOrigins.length >= 2 ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">Exit compare → {destinations[0]?.name}</span>
+                {exitCompareBusy ? (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" /> Comparing…
+                  </span>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {exitComparePlans.map((row) => (
+                      <li key={row.originSystemId}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 rounded border border-border/40 px-2 py-1 text-left hover:bg-muted/40"
+                          onClick={() => {
+                            if (row.plan.reachable) setHighlightedPlan(row.plan);
+                          }}
+                        >
+                          <span className="truncate">{row.originName}</span>
+                          <span className="shrink-0 font-mono text-muted-foreground">
+                            {row.plan.reachable ? `${row.plan.jumps}j` : '—'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {favourites.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {favourites.map((f) => (
@@ -507,12 +763,29 @@ export function RoutePlannerModule({
                 expanded={expandedSteps.has(dest.id)}
                 onToggle={() => toggleSteps(dest.id)}
                 onRemove={() => removeDestination(dest.id)}
+                onHopClick={onHopClick}
                 onSetActive={
                   onPlanHighlight && planBySystem.get(dest.systemId)?.reachable
                     ? () => {
                         const plan = planBySystem.get(dest.systemId);
                         if (plan?.reachable) void setActiveForPlan(plan);
                       }
+                    : undefined
+                }
+                experimentalRoutes={experimentalRoutes}
+                analysisOpen={analysisDestId === dest.systemId}
+                onToggleAnalysis={() =>
+                  setAnalysisDestId((prev) => (prev === dest.systemId ? null : dest.systemId))
+                }
+                analysisLines={
+                  experimentalRoutes && analysisDestId === dest.systemId && planBySystem.get(dest.systemId)
+                    ? summarizeRoutePlan({
+                        plan: planBySystem.get(dest.systemId)!,
+                        connections,
+                        stats,
+                        presence,
+                        intel,
+                      })
                     : undefined
                 }
               />
@@ -545,10 +818,12 @@ function RouteBreadcrumb({
   plan,
   computing,
   hasSource,
+  onHopClick,
 }: {
   plan: RoutePlan | undefined;
   computing: boolean;
   hasSource: boolean;
+  onHopClick?: (eveSystemId: number) => void;
 }) {
   if (!hasSource) return <span className="text-muted-foreground">Set a start system.</span>;
   if (!plan) {
@@ -562,7 +837,7 @@ function RouteBreadcrumb({
   return (
     <div className="flex flex-wrap items-center gap-[3px]">
       {plan.hops.map((hop, i) => (
-        <HopSquare key={`${hop.systemId}-${i}`} hop={hop} />
+        <HopSquare key={`${hop.systemId}-${i}`} hop={hop} onHopClick={onHopClick} />
       ))}
     </div>
   );
@@ -581,6 +856,11 @@ function DestinationRow({
   onToggle,
   onRemove,
   onSetActive,
+  onHopClick,
+  experimentalRoutes,
+  analysisOpen,
+  onToggleAnalysis,
+  analysisLines,
 }: {
   dest: RouteDestinationView;
   plan: RoutePlan | undefined;
@@ -590,6 +870,11 @@ function DestinationRow({
   onToggle: () => void;
   onRemove: () => void;
   onSetActive?: () => void;
+  onHopClick?: (eveSystemId: number) => void;
+  experimentalRoutes?: boolean;
+  analysisOpen?: boolean;
+  onToggleAnalysis?: () => void;
+  analysisLines?: { label: string; value: string }[];
 }) {
   const segments = useMemo(() => (plan ? segmentRoute(plan) : []), [plan]);
 
@@ -641,6 +926,16 @@ function DestinationRow({
                 <Copy className="size-3" />
                 Copy
               </button>
+              {experimentalRoutes && plan?.reachable && onToggleAnalysis ? (
+                <button
+                  type="button"
+                  onClick={onToggleAnalysis}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  aria-expanded={analysisOpen}
+                >
+                  Analysis
+                </button>
+              ) : null}
             </span>
           )}
         </span>
@@ -665,7 +960,12 @@ function DestinationRow({
           </button>
         </span>
       </div>
-      <RouteBreadcrumb plan={plan} computing={computing} hasSource={sourceSystemId != null} />
+      <RouteBreadcrumb
+        plan={plan}
+        computing={computing}
+        hasSource={sourceSystemId != null}
+        onHopClick={onHopClick}
+      />
       {expanded && segments.length > 0 && (
         <ol className="flex list-decimal flex-col gap-1 pl-5 text-xs leading-snug text-muted-foreground marker:font-mono">
           {segments.map((seg) => (
@@ -677,6 +977,16 @@ function DestinationRow({
           ))}
         </ol>
       )}
+      {analysisOpen && analysisLines && analysisLines.length > 0 ? (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 rounded bg-muted/20 p-2 text-[10px]">
+          {analysisLines.map((line) => (
+            <React.Fragment key={line.label}>
+              <dt className="text-muted-foreground">{line.label}</dt>
+              <dd className="text-foreground">{line.value}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      ) : null}
     </div>
   );
 }
@@ -706,13 +1016,35 @@ const VIA_LABELS: Record<RouteHop['via'], string> = {
  * One route hop as a small security-coloured marker; system name on hover.
  * Wormhole (J-space) systems render as circles, K-space systems as squares.
  */
-function HopSquare({ hop }: { hop: RouteHop }) {
+function HopSquare({
+  hop,
+  onHopClick,
+}: {
+  hop: RouteHop;
+  onHopClick?: (eveSystemId: number) => void;
+}) {
   const isWormhole = routeSpaceKind(hop.security, hop.name) === 'jspace';
+  const clickable = hop.onMap && onHopClick != null;
   return (
     <Tooltip.Root>
       <Tooltip.Trigger
         render={<span />}
-        className={`size-3 shrink-0 ${isWormhole ? 'rounded-full' : ''}`}
+        role={clickable ? 'button' : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        onClick={clickable ? () => onHopClick!(hop.systemId) : undefined}
+        onKeyDown={
+          clickable
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onHopClick!(hop.systemId);
+                }
+              }
+            : undefined
+        }
+        className={`size-3 shrink-0 ${isWormhole ? 'rounded-full' : ''} ${
+          clickable ? 'cursor-pointer ring-offset-1 hover:ring-2 hover:ring-primary/40' : ''
+        }`}
         style={{ backgroundColor: systemSecurityColor(hop.security, hop.securityStatus) }}
         aria-label={hop.name}
       />
@@ -726,6 +1058,24 @@ function HopSquare({ hop }: { hop: RouteHop }) {
         </Tooltip.Positioner>
       </Tooltip.Portal>
     </Tooltip.Root>
+  );
+}
+
+function ShortcutChip({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded border border-border/50 px-1.5 py-0.5 text-[10px] hover:bg-muted/50"
+    >
+      {children}
+    </button>
   );
 }
 

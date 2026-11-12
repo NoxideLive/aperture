@@ -220,7 +220,18 @@ import type { WormholeJumpInfoRow } from '@/types';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { experimentalUndoPush } from '@/lib/experimentalPanelUndo';
+import {
+  experimentalUndoHydrateFromStorage,
+  experimentalUndoPush,
+  experimentalUndoPushSignature,
+  experimentalUndoSetExecutor,
+} from '@/lib/experimentalPanelUndo';
+import {
+  runSignatureUndoPayload,
+  snapshotPatchInverse,
+  type SignatureUndoPayload,
+  type SignatureUndoRuntime,
+} from '@/lib/experimentalSignatureUndo';
 
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
@@ -666,13 +677,20 @@ export function MapCanvas({
   const [routeHighlightConnectionIds, setRouteHighlightConnectionIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [routeHighlightMapSystemIds, setRouteHighlightMapSystemIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [routeFocusMapSystemId, setRouteFocusMapSystemId] = useState<string | null>(null);
   const router = useRouter();
   const [pilotHoverSystemId, setPilotHoverSystemId] = useState<string | null>(null);
+  const [signatureHoverFarSystemId, setSignatureHoverFarSystemId] = useState<string | null>(null);
   const onRoutePlanHighlight = useCallback((plan: RoutePlan | null) => {
     if (!plan?.reachable) {
       setRouteHighlightConnectionIds(new Set());
+      setRouteHighlightMapSystemIds(new Set());
       return;
     }
+    const byEve = new Map(viewData.systems.map((s) => [s.systemId, s.id]));
     setRouteHighlightConnectionIds(
       new Set(
         plan.hops
@@ -680,7 +698,40 @@ export function MapCanvas({
           .map((h) => String(h.connectionId)),
       ),
     );
-  }, []);
+    setRouteHighlightMapSystemIds(
+      new Set(
+        plan.hops
+          .map((h) => byEve.get(h.systemId))
+          .filter((id): id is string => id != null),
+      ),
+    );
+  }, [viewData.systems]);
+
+  const focusMapSystemByEveId = useCallback(
+    (eveSystemId: number) => {
+      const mapSystem = viewData.systems.find((s) => s.systemId === eveSystemId);
+      if (!mapSystem) {
+        toast.info('That hop is not on the map.');
+        return;
+      }
+      setSelected({ kind: 'system', id: mapSystem.id });
+      setSelectedSystemIds(new Set([mapSystem.id]));
+      const inst = flowInstance.current;
+      const node = inst?.getNode(mapSystem.id);
+      if (inst && node) {
+        const w = node.measured?.width ?? node.width ?? 0;
+        const h = node.measured?.height ?? node.height ?? 0;
+        inst.setCenter(node.position.x + w / 2, node.position.y + h / 2, {
+          zoom: Math.max(inst.getZoom(), 0.85),
+          duration: 200,
+        });
+      }
+      setRouteFocusMapSystemId(mapSystem.id);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setRouteFocusMapSystemId(null), 3000);
+    },
+    [viewData.systems],
+  );
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
     const experimentalOnLoad = isExperimentalUiActive(initialExperimentalUi);
     const base =
@@ -1831,15 +1882,99 @@ export function MapCanvas({
     [mapId, runOptimistic],
   );
 
+  const signatureUndoRuntime = useMemo((): SignatureUndoRuntime => {
+    return {
+      mapId,
+      getSignatures: () => viewData.signatures,
+      deleteSignature: (signatureId) => {
+        void deleteSignatureOnServer({ mapId, signatureId }).then((result) => {
+          if (result.ok) {
+            appliedEventIds.current.add(result.eventId);
+            setViewData((prev) => applyEvent(prev, result.data));
+          } else void resync();
+        });
+      },
+      createSignature: (body) => {
+        void createSignatureOnServer({ mapId, body }).then((result) => {
+          if (result.ok) {
+            appliedEventIds.current.add(result.eventId);
+            setViewData((prev) => applyEvent(prev, result.data));
+          } else void resync();
+        });
+      },
+      patchSignature: (signatureId, patch) => {
+        const opt: MapEventPayload = {
+          kind: 'signature.update',
+          eventId: 0,
+          id: signatureId,
+          ...patch,
+        };
+        void runOptimistic(opt, () => updateSignatureOnServer({ mapId, signatureId, patch }));
+      },
+      bulkPaste: (payloads) => onBulkPaste(payloads as MapEventPayload[]),
+    };
+  }, [mapId, viewData.signatures, runOptimistic, onBulkPaste, resync]);
+
+  useEffect(() => {
+    if (!experimentalActive) {
+      experimentalUndoSetExecutor('signatures', null);
+      return;
+    }
+    experimentalUndoSetExecutor('signatures', (payload, direction) => {
+      runSignatureUndoPayload(signatureUndoRuntime, payload as SignatureUndoPayload, direction);
+    });
+    experimentalUndoHydrateFromStorage();
+  }, [experimentalActive, signatureUndoRuntime]);
+
+  const pushSignatureUndo = useCallback(
+    (
+      label: string,
+      undoPayload: SignatureUndoPayload,
+      redoPayload: SignatureUndoPayload | undefined,
+    ) => {
+      if (!experimentalActive) return;
+      experimentalUndoPushSignature(label, undoPayload, redoPayload, signatureUndoRuntime);
+    },
+    [experimentalActive, signatureUndoRuntime],
+  );
+
   const onSignatureCreate = useCallback(
     (body: CreateSignatureBody) => {
-      awaitServer(() => createSignatureOnServer({ mapId, body }));
+      void onSignatureCreateWithId(body);
     },
-    [mapId, awaitServer],
+    // onSignatureCreateWithId defined below
+    [mapId],
+  );
+
+  const onSignatureCreateWithId = useCallback(
+    async (body: CreateSignatureBody): Promise<string | null> => {
+      const result = await createSignatureOnServer({ mapId, body });
+      if (!result.ok) {
+        void resync();
+        return null;
+      }
+      appliedEventIds.current.add(result.eventId);
+      setViewData((prev) => applyEvent(prev, result.data));
+      const created = result.data as MapSignature;
+      if (experimentalActive) {
+        pushSignatureUndo(
+          'Add signature',
+          { kind: 'delete', snapshot: created },
+          {
+            kind: 'create',
+            forward: body,
+            createdId: created.id,
+          },
+        );
+      }
+      return created.id;
+    },
+    [mapId, resync, experimentalActive, pushSignatureUndo],
   );
 
   const onSignaturePatch = useCallback(
     (signatureId: string, patch: UpdateSignatureBody) => {
+      const prev = viewData.signatures.find((s) => s.id === signatureId);
       const opt: MapEventPayload = {
         kind: 'signature.update',
         eventId: 0,
@@ -1847,8 +1982,16 @@ export function MapCanvas({
         ...patch,
       };
       runOptimistic(opt, () => updateSignatureOnServer({ mapId, signatureId, patch }));
+      if (experimentalActive && prev) {
+        const before = snapshotPatchInverse(prev, patch);
+        pushSignatureUndo(
+          'Edit signature',
+          { kind: 'patch', signatureId, before, after: patch },
+          { kind: 'patch', signatureId, before: patch, after: before },
+        );
+      }
     },
-    [mapId, runOptimistic],
+    [mapId, runOptimistic, viewData.signatures, experimentalActive, pushSignatureUndo],
   );
 
   // If a deleted sig resolved to a wormhole, build the "delete the subchain
@@ -2126,6 +2269,9 @@ export function MapCanvas({
     selected: SelectionRef | null;
     intel: Record<number, SystemIntelSummary>;
     pilotHoverSystemId: string | null;
+    signatureHoverFarSystemId: string | null;
+    routeHighlightMapSystemIds: ReadonlySet<string>;
+    routeFocusMapSystemId: string | null;
   } | null>(null);
   if (
     !lastSync ||
@@ -2134,6 +2280,9 @@ export function MapCanvas({
     lastSync.selectedSystemIds !== selectedSystemIds ||
     lastSync.selected !== selected ||
     lastSync.pilotHoverSystemId !== pilotHoverSystemId ||
+    lastSync.signatureHoverFarSystemId !== signatureHoverFarSystemId ||
+    lastSync.routeHighlightMapSystemIds !== routeHighlightMapSystemIds ||
+    lastSync.routeFocusMapSystemId !== routeFocusMapSystemId ||
     // `intel` is replaced by reference when a live-added system's data backfills;
     // re-sync so its decorators (sov/FW/incursion) appear without a systems change.
     lastSync.intel !== intel
@@ -2145,6 +2294,9 @@ export function MapCanvas({
       selected,
       intel,
       pilotHoverSystemId,
+      signatureHoverFarSystemId,
+      routeHighlightMapSystemIds,
+      routeFocusMapSystemId,
     });
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
@@ -2165,7 +2317,12 @@ export function MapCanvas({
               isHome: s.id === viewData.map.homeMapSystemId,
               inFactionWarfare: intel[s.systemId]?.factionWar != null,
               hasIncursion: intel[s.systemId]?.incursion != null,
-              panelHoverLinked: experimentalActive && pilotHoverSystemId === s.id,
+              panelHoverLinked:
+                experimentalActive &&
+                (pilotHoverSystemId === s.id || signatureHoverFarSystemId === s.id),
+              routePathLinked:
+                experimentalActive &&
+                (routeHighlightMapSystemIds.has(s.id) || routeFocusMapSystemId === s.id),
             },
             selected: selectedSystemIds.has(s.id),
             draggable: !s.locked,
@@ -2735,10 +2892,14 @@ export function MapCanvas({
             connections={viewData.connections}
             signatures={viewData.signatures}
             onPlanHighlight={experimentalActive ? onRoutePlanHighlight : undefined}
+            onHopClick={experimentalActive ? focusMapSystemByEveId : undefined}
             mapRouteFavourites={experimentalActive ? mapRouteFavourites : undefined}
             onActiveRouteSaved={
               experimentalActive ? () => router.refresh() : undefined
             }
+            stats={experimentalActive ? stats : undefined}
+            intel={experimentalActive ? intel : undefined}
+            presence={experimentalActive ? viewData.presence : undefined}
           />
         );
       case 'intel':

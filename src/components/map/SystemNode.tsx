@@ -67,6 +67,8 @@ export type SystemNodeData = MapSystemNode & {
   hasIncursion?: boolean;
   /** Experimental: sidebar panel row is hovering this system. */
   panelHoverLinked?: boolean;
+  /** Experimental: active route path or hop focus on the map. */
+  routePathLinked?: boolean;
 };
 
 function securityLabel(node: MapSystemNode): string {
@@ -148,6 +150,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
         endpointLit ? 'ap-link-endpoint-lit' : '',
         linkDim && !endpointLit ? 'ap-link-hover-dimmed' : '',
         data.panelHoverLinked ? 'ap-panel-linked' : '',
+        data.routePathLinked ? 'ap-route-path-linked' : '',
       ]
         .filter(Boolean)
         .join(' ')}

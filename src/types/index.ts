@@ -336,6 +336,8 @@ export type RoutePrefs = {
   avoidCritical: boolean;
   avoidEol: boolean;
   includeEveScout: boolean;
+  /** When false, mapped jump-bridge overlay edges are omitted from planning (compute-only; optional). */
+  includeJumpBridge?: boolean;
 };
 
 /**
