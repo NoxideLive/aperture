@@ -762,6 +762,7 @@ export function RoutePlannerModule({
                 Jita
               </ShortcutChip>
               <ShortcutChip onClick={() => void addStagingDestination()}>Staging</ShortcutChip>
+              <ShortcutChip onClick={() => void addHomeFightRoute()}>Home → fight</ShortcutChip>
               <ShortcutChip
                 onClick={() => void addDestinationByEveId(THERA_SYSTEM_ID, 'Thera')}
               >
