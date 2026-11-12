@@ -146,3 +146,8 @@
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
 }
+
+[data-ui='experimental'] .ap-pilot-hover-card.ap-pilot-standing-friendly {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #38bdf8 35%, transparent);
+}

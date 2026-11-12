@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { PreviewCard } from '@base-ui/react/preview-card';
 import { Tooltip } from '@base-ui/react/tooltip';
@@ -9,12 +10,20 @@ import {
   CircleDashed,
   Clock,
   Home,
+  ArrowDown,
+  ArrowUp,
   Lock,
   Radiation,
   Signal,
   Swords,
   type LucideIcon,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
+import {
+  pilotBadgeToneClasses,
+  pilotCountStandingTone,
+} from '@/lib/experimentalPilotPresence';
 import type { MapPresenceEntry, MapSystemNode } from '@/lib/map/loadMap';
 import { formatAgoFromMs } from '@/lib/map/relativeTime';
 import {
@@ -518,6 +527,20 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
  * pan/drag. Hover/focus opens a `SystemPresenceTable` of this system's pilots.
  */
 function PresenceBadge({ pilots }: { pilots: readonly MapPresenceEntry[] }) {
+  const experimental = isExperimentalUiActive(readExperimentalUiFromHtml());
+  const standing = pilotCountStandingTone(pilots.length);
+  const [delta, setDelta] = useState<'up' | 'down' | null>(null);
+  const prevCount = useRef(pilots.length);
+
+  useEffect(() => {
+    if (!experimental) return;
+    if (pilots.length > prevCount.current) setDelta('up');
+    else if (pilots.length < prevCount.current) setDelta('down');
+    prevCount.current = pilots.length;
+    const timer = window.setTimeout(() => setDelta(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [pilots.length, experimental]);
+
   return (
     // Anchor the pill's bottom-right corner near the tile's top-left corner
     // (`-translate-x-full -translate-y-full`) so it grows up and to the left as
@@ -528,15 +551,34 @@ function PresenceBadge({ pilots }: { pilots: readonly MapPresenceEntry[] }) {
           // Render as a button so it's keyboard-focusable; default `<a>` would
           // suggest a navigation.
           render={<button type="button" />}
-          className="nodrag nopan pointer-events-auto inline-flex items-center rounded-full bg-card px-2 py-1 text-sm font-semibold leading-none text-primary shadow-sm ring-1 ring-primary/40"
+          delay={experimental ? 0 : undefined}
+          closeDelay={experimental ? 100 : undefined}
+          className={cn(
+            'nodrag nopan pointer-events-auto inline-flex items-center gap-0.5 rounded-full bg-card px-2 py-1 text-sm font-semibold leading-none shadow-sm ring-1',
+            experimental
+              ? pilotBadgeToneClasses(standing)
+              : 'text-primary ring-primary/40',
+          )}
           aria-label={`${pilots.length} pilot${pilots.length === 1 ? '' : 's'} in system`}
         >
           {pilots.length}
+          {experimental && delta === 'up' ? (
+            <ArrowUp className="size-3 text-emerald-400" aria-hidden />
+          ) : null}
+          {experimental && delta === 'down' ? (
+            <ArrowDown className="size-3 text-red-400" aria-hidden />
+          ) : null}
         </PreviewCard.Trigger>
         <PreviewCard.Portal>
           <PreviewCard.Positioner sideOffset={4} side="top" align="start">
-            <PreviewCard.Popup className="nodrag nopan z-50 min-w-40 rounded-md border bg-popover p-0 text-xs text-popover-foreground shadow-md">
-              <SystemPresenceTable presence={pilots} />
+            <PreviewCard.Popup
+              className={cn(
+                'nodrag nopan z-50 min-w-44 rounded-md border bg-popover p-0 text-xs text-popover-foreground shadow-md',
+                experimental && 'ap-pilot-hover-card',
+                experimental && standing === 'friendly' && 'ap-pilot-standing-friendly',
+              )}
+            >
+              <SystemPresenceTable presence={pilots} colorNamesByStanding={experimental} />
             </PreviewCard.Popup>
           </PreviewCard.Positioner>
         </PreviewCard.Portal>

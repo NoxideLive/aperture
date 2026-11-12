@@ -152,6 +152,7 @@ import { MapUnderglowProvider } from './MapUnderglowContext';
 import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { PresenceSoundBridge } from './PresenceSoundBridge';
 import { RallySoundBridge } from './RallySoundBridge';
+import { ExperimentalRallyNotify } from './ExperimentalRallyNotify';
 import { SystemNotificationSoundBridge } from './SystemNotificationSoundBridge';
 import { WatchedConnectionSoundBridge } from './WatchedConnectionSoundBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
@@ -162,7 +163,7 @@ import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
 import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
 import { MapStyleProvider } from './MapStyleContext';
-import { MapLinkHoverProvider, useIsLinkHoverDimActive } from './MapLinkHoverContext';
+import { MapLinkHoverProvider } from './MapLinkHoverContext';
 import { homePathConnectionIds } from '@/lib/map/homePath';
 import type { MapStyleOptions } from './styling';
 import { MAP_LAYOUT_ROW_HEIGHT, MapLayoutGrid } from './layout/MapLayoutGrid';
@@ -2489,6 +2490,7 @@ export function MapCanvas({
                 <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
+              {experimentalActive && <ExperimentalRallyNotify mapId={mapId} />}
               <SignaturePasteHotkey
                 mapId={mapId}
                 selectedSystem={selectedSystem}
