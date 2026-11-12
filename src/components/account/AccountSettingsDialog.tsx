@@ -38,15 +38,19 @@ import {
 import { useExperimentalHoverDelayContext } from '@/lib/experimentalHoverDelay.client';
 import { isExperimentalUiActive } from '@/lib/experimentalUi';
 import {
+  readExperimentalCombatAlertSound,
   readExperimentalRallyDesktopNotification,
   readExperimentalRallyToast,
+  writeExperimentalCombatAlertSound,
   writeExperimentalRallyDesktopNotification,
   writeExperimentalRallyToast,
 } from '@/lib/experimentalAlertPrefs';
 import {
+  readExperimentalAutoMassFromLog,
   readExperimentalPointerCursor,
   readKeepMapSelection,
   readPastePreviewOnCtrlV,
+  writeExperimentalAutoMassFromLog,
   writeExperimentalPointerCursor,
   writeKeepMapSelection,
   writePastePreviewOnCtrlV,
@@ -114,6 +118,8 @@ export function AccountSettingsDialog({
   const [pastePreview, setPastePreview] = useState(readPastePreviewOnCtrlV);
   const [rallyToast, setRallyToast] = useState(readExperimentalRallyToast);
   const [rallyDesktop, setRallyDesktop] = useState(readExperimentalRallyDesktopNotification);
+  const [combatSound, setCombatSound] = useState(readExperimentalCombatAlertSound);
+  const [autoMass, setAutoMass] = useState(readExperimentalAutoMassFromLog);
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -404,7 +410,19 @@ export function AccountSettingsDialog({
                       writePastePreviewOnCtrlV(e.target.checked);
                     }}
                   />
-                  Preview signature paste (coming: opens diff dialog)
+                  Preview signature paste on Ctrl+V
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={autoMass}
+                    onChange={(e) => {
+                      setAutoMass(e.target.checked);
+                      writeExperimentalAutoMassFromLog(e.target.checked);
+                    }}
+                  />
+                  Auto-set link mass from jump log
                 </label>
               </div>
             ) : null}
@@ -439,6 +457,18 @@ export function AccountSettingsDialog({
                     }}
                   />
                   Rally desktop notification
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={combatSound}
+                    onChange={(e) => {
+                      setCombatSound(e.target.checked);
+                      writeExperimentalCombatAlertSound(e.target.checked);
+                    }}
+                  />
+                  Combat kill alert sound
                 </label>
               </div>
             ) : null}

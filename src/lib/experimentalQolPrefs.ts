@@ -5,6 +5,7 @@ import { readExperimentalUiFromHtml, isExperimentalUiActive } from '@/lib/experi
 const KEEP_SELECTION_KEY = 'aperture:experimental:keep-map-selection';
 const POINTER_CURSOR_KEY = 'aperture:experimental:pointer-cursor';
 const PASTE_PREVIEW_KEY = 'aperture:experimental:paste-preview';
+const AUTO_MASS_KEY = 'aperture:experimental:auto-mass-from-log';
 
 export const EXPERIMENTAL_POINTER_CURSOR_DEFAULT = true;
 
@@ -79,4 +80,25 @@ export function writePastePreviewOnCtrlV(on: boolean): void {
     return;
   }
   window.dispatchEvent(new CustomEvent('aperture:experimental-qol-prefs'));
+}
+
+export function readExperimentalAutoMassFromLog(): boolean {
+  return experimentalOnly(() => readFlag(AUTO_MASS_KEY), false);
+}
+
+export function writeExperimentalAutoMassFromLog(on: boolean): void {
+  try {
+    localStorage.setItem(AUTO_MASS_KEY, on ? '1' : '0');
+  } catch {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent('aperture:experimental-qol-prefs'));
+}
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
 }

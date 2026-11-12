@@ -18,7 +18,9 @@ import {
   LAZY_DELETE_PASTE_OPTIONS,
 } from '@/lib/map/applySignaturePaste';
 import { usePresenceStore } from './MapPresenceContext';
-import type { MapEventPayload, MapSystemNode, ParsedSigRow } from '@/types';
+import { SignaturePasteDialog } from '@/components/dialogs/SignaturePasteDialog';
+import { readPastePreviewOnCtrlV } from '@/lib/experimentalQolPrefs';
+import type { MapEventPayload, MapSignature, MapSystemNode, ParsedSigRow } from '@/types';
 
 /**
  * Fast-scanning CTRL+V: a document-level `paste` listener that applies in-game
@@ -41,11 +43,13 @@ export function SignaturePasteHotkey({
   lazyDelete,
   onLazyDeleteConsume,
   onLazyDeletePasteResult,
+  signatures,
 }: {
   mapId: string;
   selectedSystem: MapSystemNode | null;
   fallbackSystem?: MapSystemNode | null;
   systems: MapSystemNode[];
+  signatures: readonly MapSignature[];
   viewerCharacterIds: number[];
   onBulkPaste: (payloads: MapEventPayload[]) => void;
   /** When armed, the next committed direct paste also removes missing sigs. */
@@ -66,6 +70,10 @@ export function SignaturePasteHotkey({
     targetSystem: MapSystemNode;
     /** Name of a system one of the viewer's pilots is in, or null if none are located. */
     locationName: string | null;
+  } | null>(null);
+  const [preview, setPreview] = useState<{
+    text: string;
+    targetSystem: MapSystemNode;
   } | null>(null);
 
   // The paste listener is registered once; it reads the latest props/state
@@ -134,6 +142,11 @@ export function SignaturePasteHotkey({
         return;
       }
 
+      if (readPastePreviewOnCtrlV()) {
+        setPreview({ text, targetSystem });
+        return;
+      }
+
       // The EVE solar-system ids the viewer's pilots are currently located in
       // (read live off the stable store instance).
       const myLocations = viewerCharacterIds
@@ -163,7 +176,29 @@ export function SignaturePasteHotkey({
 
   const targetName = confirm ? (confirm.targetSystem.alias ?? confirm.targetSystem.name) : '';
 
+  const previewSigs = preview
+    ? signatures.filter((s) => s.mapSystemId === preview.targetSystem.id)
+    : [];
+
   return (
+    <>
+      {preview ? (
+        <SignaturePasteDialog
+          open
+          onOpenChange={(open) => !open && setPreview(null)}
+          mapId={mapId}
+          mapSystemId={preview.targetSystem.id}
+          existingSigs={previewSigs}
+          initialText={preview.text}
+          onResult={(payloads) => {
+            const armed = latest.current.lazyDelete;
+            if (armed) latest.current.onLazyDeletePasteResult(payloads);
+            else latest.current.onBulkPaste(payloads);
+            if (armed) latest.current.onLazyDeleteConsume();
+            setPreview(null);
+          }}
+        />
+      ) : null}
     <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
       <DialogContent>
         <DialogHeader>
@@ -190,6 +225,7 @@ export function SignaturePasteHotkey({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 

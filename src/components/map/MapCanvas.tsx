@@ -82,7 +82,7 @@ import {
   deleteStructureOnServer,
   updateStructureOnServer,
 } from '@/lib/structures/client';
-import { mapUpdateLoadSchema, type Envelope } from '@/lib/realtime/protocol';
+import { connectionMassLogLoadSchema, mapUpdateLoadSchema, type Envelope } from '@/lib/realtime/protocol';
 import {
   useMapSubscription,
   useRealtimeEvents,
@@ -153,6 +153,10 @@ import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { PresenceSoundBridge } from './PresenceSoundBridge';
 import { RallySoundBridge } from './RallySoundBridge';
 import { ExperimentalRallyNotify } from './ExperimentalRallyNotify';
+import { ExperimentalCombatRingProvider } from './ExperimentalCombatRingContext';
+import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
+import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
+import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
 import { SystemNotificationSoundBridge } from './SystemNotificationSoundBridge';
 import { WatchedConnectionSoundBridge } from './WatchedConnectionSoundBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
@@ -184,7 +188,10 @@ import {
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
-import { readKeepMapSelection } from '@/lib/experimentalQolPrefs';
+import { readExperimentalAutoMassFromLog, readKeepMapSelection } from '@/lib/experimentalQolPrefs';
+import { massStatusFromCumulative } from '@/lib/experimentalAutoMass';
+import { fetchWormholeJumpInfo } from '@/lib/reference/client';
+import type { WormholeJumpInfoRow } from '@/types';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
@@ -399,6 +406,8 @@ export function MapCanvas({
   const [mapInfoOpen, setMapInfoOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
+  const whMassRef = useRef<WormholeJumpInfoRow[] | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [addSystemOpen, setAddSystemOpen] = useState(false);
   const [sigSearchFilters, setSigSearchFilters] = useState<SigSearchFilters>({
@@ -1656,6 +1665,32 @@ export function MapCanvas({
     return () => window.removeEventListener('keydown', onKey);
   }, [experimentalActive, selected, onConnectionPatch]);
 
+  useRealtimeEvents(
+    useCallback(
+      (envelope: Envelope) => {
+        if (!experimentalActive || !readExperimentalAutoMassFromLog()) return;
+        if (envelope.task !== 'connectionMassLog') return;
+        const parsed = connectionMassLogLoadSchema.safeParse(envelope.load);
+        if (!parsed.success || parsed.data.mapId !== Number(mapId)) return;
+        const { connectionId, cumulativeMass } = parsed.data;
+        void (async () => {
+          if (!whMassRef.current) {
+            const wh = await fetchWormholeJumpInfo();
+            if (wh.ok) whMassRef.current = wh.data;
+          }
+          const sig = viewData.signatures.find((s) => s.mapConnectionId === connectionId);
+          const ref = whMassRef.current?.find((r) => r.typeId === sig?.typeId) ?? null;
+          const status = massStatusFromCumulative(cumulativeMass, ref?.totalMass ?? null);
+          if (!status) return;
+          const conn = viewData.connections.find((c) => c.id === connectionId);
+          if (!conn || conn.massStatus === status) return;
+          onConnectionPatch(connectionId, { massStatus: status });
+        })();
+      },
+      [experimentalActive, mapId, onConnectionPatch, viewData.connections, viewData.signatures],
+    ),
+  );
+
   const onConnectionDelete = useCallback(
     (connectionId: string) => {
       runOptimistic(
@@ -2173,6 +2208,27 @@ export function MapCanvas({
     });
   }, [selectedSystem]);
 
+  const jumpToMapSystem = useCallback(
+    (mapSystemId: string) => {
+      const sys = viewData.systems.find((s) => s.id === mapSystemId);
+      if (!sys) return;
+      setSelected({ kind: 'system', id: mapSystemId });
+      setSelectedSystemIds(new Set([mapSystemId]));
+      setLastPrimarySystem(sys);
+      const inst = flowInstance.current;
+      if (!inst) return;
+      const node = inst.getNode(mapSystemId);
+      if (!node) return;
+      const w = node.measured?.width ?? node.width ?? 0;
+      const h = node.measured?.height ?? node.height ?? 0;
+      inst.setCenter(node.position.x + w / 2, node.position.y + h / 2, {
+        zoom: inst.getZoom(),
+        duration: 300,
+      });
+    },
+    [viewData.systems],
+  );
+
   const commandHandlersRef = useRef({
     focusPanelByShortcut,
     fitMapView,
@@ -2270,6 +2326,12 @@ export function MapCanvas({
         label: 'Jump to selected system (center map)',
         keywords: 'pan focus navigate',
         run: () => commandHandlersRef.current.centerOnSelectedSystem(),
+      });
+      actions.push({
+        id: 'jump-picker',
+        label: 'Jump to system on map…',
+        keywords: 'search pan focus navigate',
+        run: () => setJumpPickerOpen(true),
       });
       if (selected?.kind === 'connection') {
         const connId = selected.id;
@@ -2570,6 +2632,7 @@ export function MapCanvas({
     <MapPresenceProvider initial={data.presence} mapId={data.map.id}>
       <MapActiveCharProvider viewerCharacters={viewerCharacters} mainCharacterId={mainCharacterId}>
         <MapTravelProvider>
+          <ExperimentalCombatRingProvider>
           <MapUnderglowProvider>
             <MapSignatureIndicatorProvider
               signatures={viewData.signatures}
@@ -2601,11 +2664,18 @@ export function MapCanvas({
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
               {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
+              {experimentalActive ? (
+                <ExperimentalCombatSoundBridge mapId={mapId} systems={viewData.systems} />
+              ) : null}
+              {experimentalActive ? (
+                <ExperimentalCombatKillBridge mapId={mapId} systems={viewData.systems} />
+              ) : null}
               <SignaturePasteHotkey
                 mapId={mapId}
                 selectedSystem={selectedSystem}
                 fallbackSystem={lastPrimarySystem}
                 systems={viewData.systems}
+                signatures={viewData.signatures}
                 viewerCharacterIds={viewerCharacterIds}
                 onBulkPaste={onSignaturePasteResult}
                 lazyDelete={lazyDeleteSigs}
@@ -2770,8 +2840,17 @@ export function MapCanvas({
                 existingSystemIds={existingSystemIds}
                 onAdd={onAddSystem}
               />
+              {experimentalActive ? (
+                <MapJumpToSystemDialog
+                  open={jumpPickerOpen}
+                  onOpenChange={setJumpPickerOpen}
+                  systems={viewData.systems}
+                  onJump={jumpToMapSystem}
+                />
+              ) : null}
             </MapSignatureIndicatorProvider>
           </MapUnderglowProvider>
+          </ExperimentalCombatRingProvider>
         </MapTravelProvider>
       </MapActiveCharProvider>
     </MapPresenceProvider>
