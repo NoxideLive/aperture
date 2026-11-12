@@ -1,6 +1,33 @@
 /* Experimental chrome tokens — active only when `data-ui="experimental"` is on <html>. */
 
-[data-ui="experimental"][data-theme="dark"] {
+/* exp-dark (`data-variant="aperture"`): neutral legacy Aperture chrome — same tokens as `.dark`. */
+[data-ui="experimental"][data-theme="dark"][data-variant="aperture"] {
+  color-scheme: dark;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.8 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.82 0 0);
+  --map-node: oklch(0.285 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.8 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.85 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.66 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.85 0 0);
+  --destructive: oklch(68.025% 0.2081 23.639);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --radius: 0.5rem;
+  --xy-background-color: oklch(0.215 0 0);
+}
+
+/* exp-slate: blue-tinted experimental chrome. */
+[data-ui="experimental"][data-theme="dark"][data-variant="slate"] {
   color-scheme: dark;
   --background: #121821;
   --foreground: #e8eef4;
