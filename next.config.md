@@ -7,6 +7,7 @@
 
 ### nextConfig (default export)
 
+- `reactStrictMode: false` — disables React Strict Mode's dev double-mount so xyflow's per-mount store reset does not drop connection edges on the map canvas (system nodes still recover via `onNodesChange`).
 - `typedRoutes: true` — typed `Route` link checking.
 - `serverExternalPackages: ['pg', 'graphile-worker', 'pino']` — keep these native/Node-only packages out of the server bundle. `pino` is external so its runtime `require` of `sonic-boom`/thread-stream isn't mangled by the bundler (the structured logger, `src/lib/log/logger.ts`).
 - `turbopack.root` — pins the workspace root to this directory.
