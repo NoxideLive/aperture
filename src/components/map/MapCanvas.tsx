@@ -633,10 +633,13 @@ export function MapCanvas({
   const handleLayoutChange = useCallback(
     (_current: Layout, all: ResponsiveLayouts<Breakpoint>) => {
       setLayout((prev) => {
+        if (layoutPersistSkipRef.current) {
+          layoutPersistSkipRef.current = false;
+          return prev;
+        }
         const next: MapLayoutConfig = { ...prev, layouts: mergeLayouts(prev.layouts, all) };
-        if (!firstLayoutChange.current && !layoutPersistSkipRef.current) saveLayout(next);
+        if (!firstLayoutChange.current) saveLayout(next);
         firstLayoutChange.current = false;
-        layoutPersistSkipRef.current = false;
         return next;
       });
     },
