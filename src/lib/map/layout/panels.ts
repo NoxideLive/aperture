@@ -119,34 +119,38 @@ export const DEFAULT_MAP_LAYOUT: MapLayoutConfig = {
   hidden: [],
 };
 
-const EXPERIMENTAL_RIGHT_MEMBERS: PanelId[] = [
-  'inspector',
-  'route',
-  'intel',
-  'structure',
-  'killStats',
-  'systemKillboard',
-  'thera',
-  'systemGraph',
-  'tags',
+type ExperimentalRightGroup = { id: PanelId; anchor: PanelId; h: number };
+
+const EXPERIMENTAL_RIGHT_STACK: ExperimentalRightGroup[] = [
+  { id: 'inspector', anchor: 'inspector', h: 5 },
+  { id: 'route', anchor: 'route', h: 4 },
+  { id: 'systemKillboard', anchor: 'systemKillboard', h: 4 },
+  { id: 'thera', anchor: 'thera', h: 4 },
+  { id: 'systemGraph', anchor: 'systemGraph', h: 4 },
+  { id: 'structure', anchor: 'structure', h: 3 },
 ];
 
 function experimentalWideLayout(cols: number) {
   const leftW = cols === 12 ? 8 : 5;
   const rightX = leftW;
   const rightW = cols - leftW;
-  const workbenchId: PanelId = 'inspector';
-  return [
-    { i: 'canvas' as PanelId, x: 0, y: 0, w: leftW, h: 12, ...PANEL_MIN.canvas },
-    { i: 'signatures' as PanelId, x: 0, y: 12, w: leftW, h: 8, ...PANEL_MIN.signatures },
-  {
-      i: workbenchId,
+  let yRight = 0;
+  const rightCells = EXPERIMENTAL_RIGHT_STACK.map(({ id, anchor, h }) => {
+    const item = {
+      i: id,
       x: rightX,
-      y: 0,
+      y: yRight,
       w: rightW,
-      h: 16,
-      ...PANEL_MIN[workbenchId],
-    },
+      h,
+      ...PANEL_MIN[anchor],
+    };
+    yRight += h;
+    return item;
+  });
+  return [
+    { i: 'canvas' as PanelId, x: 0, y: 0, w: leftW, h: 14, ...PANEL_MIN.canvas },
+    { i: 'signatures' as PanelId, x: 0, y: 14, w: leftW, h: 8, ...PANEL_MIN.signatures },
+    ...rightCells,
   ];
 }
 
@@ -159,11 +163,12 @@ const experimentalLayouts: Record<Breakpoint, Layout> = {
 const experimentalGroupsLg: PanelGroup[] = [
   { id: 'canvas', members: ['canvas'], active: 'canvas' },
   { id: 'signatures', members: ['signatures'], active: 'signatures' },
-  {
-    id: 'inspector',
-    members: EXPERIMENTAL_RIGHT_MEMBERS,
-    active: 'inspector',
-  },
+  { id: 'inspector', members: ['inspector', 'intel'], active: 'inspector' },
+  { id: 'route', members: ['route'], active: 'route' },
+  { id: 'systemKillboard', members: ['systemKillboard', 'killStats'], active: 'systemKillboard' },
+  { id: 'thera', members: ['thera', 'sigSearch'], active: 'thera' },
+  { id: 'systemGraph', members: ['systemGraph', 'tags'], active: 'systemGraph' },
+  { id: 'structure', members: ['structure'], active: 'structure' },
 ];
 
 /** Default dashboard when `ap_user.map_layout` is null and experimental UI is on. */
@@ -175,7 +180,7 @@ export const EXPERIMENTAL_DEFAULT_MAP_LAYOUT: MapLayoutConfig = {
     md: experimentalGroupsLg,
     sm: singletonGroups(stackedLayout),
   },
-  hidden: ['sigSearch'],
+  hidden: [],
 };
 
 /** Pick the built-in default for users without a saved layout. */

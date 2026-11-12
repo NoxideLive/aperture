@@ -15,10 +15,11 @@ describe('defaultMapLayoutForUi', () => {
     expect(defaultMapLayoutForUi(true)).toBe(EXPERIMENTAL_DEFAULT_MAP_LAYOUT);
   });
 
-  it('groups the right column workbench while keeping the legacy default untouched', () => {
-    const workbench = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'inspector');
-    expect(workbench?.members).toContain('systemGraph');
-    expect(workbench?.members).toContain('tags');
+  it('groups the right column tab strips while keeping the legacy default untouched', () => {
+    const inspector = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'inspector');
+    expect(inspector?.members).toEqual(['inspector', 'intel']);
+    const thera = EXPERIMENTAL_DEFAULT_MAP_LAYOUT.groups.lg.find((g) => g.id === 'thera');
+    expect(thera?.members).toContain('sigSearch');
     expect(EXPERIMENTAL_DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(8);
     expect(DEFAULT_MAP_LAYOUT.layouts.lg.find((i) => i.i === 'signatures')?.h).toBe(6);
   });
