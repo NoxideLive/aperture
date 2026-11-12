@@ -101,32 +101,57 @@
   gap: 1rem;
 }
 
-/* Map link salience — experimental importance-ordered connections */
+/* Map link salience — experimental EOL outline (mass colour stays on the base path) */
 [data-ui='experimental'] .ap-connection-eol-outline {
-  stroke: #a855f7;
-  stroke-width: 8px;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgb(168 85 247 / 0.75));
-  animation: ap-eol-outline-pulse 3.2s ease-in-out infinite;
+  pointer-events: none;
 }
 
-[data-ui='experimental'][data-theme='light'] .ap-connection-eol-outline {
+/* ~4h EOL: moderate purple, static (critical mass red on the line reads louder) */
+[data-ui='experimental'] .ap-connection-eol-stage-eol {
+  stroke: #a855f7;
+  stroke-width: 5px;
+  stroke-opacity: 0.62;
+  filter: drop-shadow(0 0 2px rgb(168 85 247 / 0.35));
+}
+
+[data-ui='experimental'][data-theme='light'] .ap-connection-eol-stage-eol {
   stroke: #7e22ce;
+  stroke-opacity: 0.68;
 }
 
-[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-outline {
-  stroke: #d747d6;
+[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-stage-eol {
+  stroke: #c73fc5;
+  stroke-width: 4px;
+  stroke-opacity: 0.72;
+}
+
+/* ~1h EOL critical: stronger outline + slow pulse */
+[data-ui='experimental'] .ap-connection-eol-stage-critical {
+  stroke: #9333ea;
   stroke-width: 6px;
+  stroke-opacity: 0.82;
+  filter: drop-shadow(0 0 3px rgb(147 51 234 / 0.45));
+  animation: ap-eol-outline-pulse 3.6s ease-in-out infinite;
+}
+
+[data-ui='experimental'][data-theme='light'] .ap-connection-eol-stage-critical {
+  stroke: #6b21a8;
+}
+
+[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-stage-critical {
+  stroke: #d747d6;
+  stroke-width: 5px;
 }
 
 @keyframes ap-eol-outline-pulse {
   0%,
   100% {
-    stroke-opacity: 0.45;
+    stroke-opacity: 0.55;
   }
   50% {
-    stroke-opacity: 1;
+    stroke-opacity: 0.95;
   }
 }
 
@@ -146,9 +171,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-ui='experimental'] .ap-connection-eol-outline {
+  [data-ui='experimental'] .ap-connection-eol-stage-critical {
     animation: none;
-    stroke-opacity: 0.88;
+    stroke-opacity: 0.82;
   }
 }
 

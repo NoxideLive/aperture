@@ -288,7 +288,7 @@ export type EdgeStyle = {
 };
 
 const IMPORTANCE_WH_FRESH_DARK = { stroke: '#6b7280', width: 1.5, opacity: 0.32 };
-const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.42 };
+const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.28 };
 const IMPORTANCE_WH_REDUCED_DARK = { stroke: '#f59e0b', width: 2.5, opacity: 0.95 };
 const IMPORTANCE_WH_REDUCED_LIGHT = { stroke: '#b45309', width: 2.5, opacity: 1 };
 const IMPORTANCE_WH_CRITICAL_DARK = { stroke: '#ef4444', width: 4, opacity: 1 };
@@ -304,6 +304,15 @@ function importanceWhFresh(opts: MapStyleOptions | undefined) {
   const { theme, variant } = resolved(opts);
   if (variant === 'classic') return IMPORTANCE_CLASSIC_WH_FRESH;
   return theme === 'light' ? IMPORTANCE_WH_FRESH_LIGHT : IMPORTANCE_WH_FRESH_DARK;
+}
+
+/** Experimental-only purple outline classes by `eolStage` (mass stays on the base path). */
+export function experimentalEolOutlineClass(
+  eolStage: MapConnectionEdge['eolStage'],
+): string | null {
+  if (eolStage === 'eol') return 'ap-connection-eol-outline ap-connection-eol-stage-eol';
+  if (eolStage === 'critical') return 'ap-connection-eol-outline ap-connection-eol-stage-critical';
+  return null;
 }
 
 function connectionImportanceStyle(
