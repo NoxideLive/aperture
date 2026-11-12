@@ -153,6 +153,9 @@ import { MapUnderglowBridge } from './MapUnderglowBridge';
 import { PresenceSoundBridge } from './PresenceSoundBridge';
 import { RallySoundBridge } from './RallySoundBridge';
 import { ExperimentalRallyNotify } from './ExperimentalRallyNotify';
+import { ExperimentalCombatRingProvider } from './ExperimentalCombatRingContext';
+import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
+import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
 import { SystemNotificationSoundBridge } from './SystemNotificationSoundBridge';
 import { WatchedConnectionSoundBridge } from './WatchedConnectionSoundBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
@@ -2460,6 +2463,7 @@ export function MapCanvas({
     <MapPresenceProvider initial={data.presence} mapId={data.map.id}>
       <MapActiveCharProvider viewerCharacters={viewerCharacters} mainCharacterId={mainCharacterId}>
         <MapTravelProvider>
+          <ExperimentalCombatRingProvider>
           <MapUnderglowProvider>
             <MapSignatureIndicatorProvider
               signatures={viewData.signatures}
@@ -2490,7 +2494,13 @@ export function MapCanvas({
                 <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
-              {experimentalActive && <ExperimentalRallyNotify mapId={mapId} />}
+              {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
+              {experimentalActive ? (
+                <ExperimentalCombatSoundBridge mapId={mapId} systems={viewData.systems} />
+              ) : null}
+              {experimentalActive ? (
+                <ExperimentalCombatKillBridge mapId={mapId} systems={viewData.systems} />
+              ) : null}
               <SignaturePasteHotkey
                 mapId={mapId}
                 selectedSystem={selectedSystem}
