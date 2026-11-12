@@ -18,6 +18,7 @@ import {
   getSignatureIndicatorPrefs,
   requireSession,
 } from '@/lib/session';
+import { getExperimentalUiFromCookies } from '@/lib/experimentalUi.server';
 
 function parseMapId(slug?: string[]): bigint | null {
   const raw = slug?.[0];
@@ -51,6 +52,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
   }
 
   const systemIds = data.systems.map((s) => s.systemId);
+  const experimentalUi = await getExperimentalUiFromCookies();
   const [
     stats,
     intel,
@@ -117,6 +119,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
         routePrefs={routeConfig.prefs}
         routeDestinations={routeConfig.destinations}
         mapLayout={mapLayout}
+        initialExperimentalUi={experimentalUi}
       />
     </>
   );

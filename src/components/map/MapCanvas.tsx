@@ -178,7 +178,7 @@ import {
 } from '@/lib/map/layout/panels';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
-import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
+import { isExperimentalUiActive } from '@/lib/experimentalUi';
 import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import { toast } from 'sonner';
 
@@ -313,6 +313,7 @@ export function MapCanvas({
   routePrefs,
   routeDestinations,
   mapLayout,
+  initialExperimentalUi,
 }: {
   data: MapViewData;
   stats: Record<number, SystemStatsSummary>;
@@ -358,6 +359,8 @@ export function MapCanvas({
    * `DEFAULT_MAP_LAYOUT`.
    */
   mapLayout?: MapLayoutConfig | null;
+  /** SSR-resolved experimental UI mode for seeding the default layout when `mapLayout` is null. */
+  initialExperimentalUi: import('@/lib/experimentalUi').ExperimentalUiMode;
 }) {
   const [selected, setSelected] = useState<SelectionRef | null>(null);
   // The multi-select set; `selected` (above) remains the primary anchor that
@@ -584,7 +587,7 @@ export function MapCanvas({
     [experimentalActive, experimentalUi],
   );
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
-    const experimentalOnLoad = isExperimentalUiActive(readExperimentalUiFromHtml());
+    const experimentalOnLoad = isExperimentalUiActive(initialExperimentalUi);
     const base =
       mapLayout ??
       defaultMapLayoutForUi(experimentalOnLoad);
@@ -2086,11 +2089,7 @@ export function MapCanvas({
       setSettingsOpen,
       setMapInfoOpen,
     };
-<<<<<<< HEAD
-  }, [focusPanelByShortcut, fitMapView, setExperimentalUi]);
-=======
   }, [focusPanelByShortcut, fitMapView, setExperimentalUi, setSettingsOpen, setMapInfoOpen]);
->>>>>>> experimental-ui-command-palette
 
   /* eslint-disable react-hooks/refs -- palette `run` handlers read commandHandlersRef only when invoked */
   const commandActions = useMemo((): import('./MapCommandPalette').MapCommandAction[] => {
