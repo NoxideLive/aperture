@@ -5,9 +5,6 @@
 
 ---
 
-### setMapActiveRouteInputSchema
-Re-exported from `@/lib/map/mapActiveRouteSchema` for unit tests.
-
 ### setMapActiveRouteAction(input)
 Replaces any existing active route for the viewer on the map; stores plan hops and follower character ids.
 

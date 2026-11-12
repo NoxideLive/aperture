@@ -8,8 +8,6 @@ import { canViewMap } from '@/lib/auth/rights';
 import type { MapActiveRouteView, RouteHop } from '@/types';
 import { setMapActiveRouteInputSchema } from '@/lib/map/mapActiveRouteSchema';
 
-export { setMapActiveRouteInputSchema };
-
 export async function setMapActiveRouteAction(
   input: unknown,
 ): Promise<{ ok: true; data: MapActiveRouteView } | { ok: false; error: string }> {
