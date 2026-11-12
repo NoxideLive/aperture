@@ -31,11 +31,43 @@ export function experimentalUndoResetAll(): void {
   stacks.clear();
 }
 
+const STORAGE_KEY = 'aperture:experimental:undo:v1';
+
+type StoredStacks = Record<string, { labels: string[] }>;
+
+function persistStacks(): void {
+  if (typeof localStorage === 'undefined') return;
+  const data: StoredStacks = {};
+  for (const [panel, stack] of stacks.entries()) {
+    data[panel] = { labels: stack.past.map((e) => e.label).slice(-EXPERIMENTAL_UNDO_MAX) };
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    /* quota */
+  }
+}
+
+export function experimentalUndoHydrateFromStorage(): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as StoredStacks;
+    for (const panel of Object.keys(parsed) as ExperimentalUndoPanel[]) {
+      if (!stacks.has(panel)) stacks.set(panel, { past: [], future: [] });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function experimentalUndoPush(panel: ExperimentalUndoPanel, cmd: ExperimentalUndoCommand): void {
   const s = getStack(panel);
   s.future = [];
   s.past.push({ ...cmd, seq: Date.now() });
   while (s.past.length > EXPERIMENTAL_UNDO_MAX) s.past.shift();
+  persistStacks();
 }
 
 export function experimentalUndoCan(panel: ExperimentalUndoPanel): { undo: boolean; redo: boolean } {

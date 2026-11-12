@@ -7,7 +7,7 @@ import type { Breakpoint, MapLayoutConfig, PanelGroup, PanelId, StoredMapLayout 
 // modules stacked in a right column.
 
 /** Bumped when the stored shape changes incompatibly; gates a reset/migration. */
-export const LAYOUT_CONFIG_VERSION = 2;
+export const LAYOUT_CONFIG_VERSION = 3;
 
 /** Responsive breakpoint min-widths (px) and column counts, shared by the grid. */
 export const PANEL_BREAKPOINTS: Record<Breakpoint, number> = { lg: 1200, md: 768, sm: 0 };
@@ -28,6 +28,10 @@ export const PANELS: PanelDef[] = [
   { id: 'sigSearch', title: 'Signature Search', defaultVisible: true, minW: 4, minH: 3 },
   { id: 'inspector', title: 'Inspector', defaultVisible: true, minW: 1, minH: 3 },
   { id: 'route', title: 'Routes', defaultVisible: true, minW: 2, minH: 2 },
+  { id: 'currentRoute', title: 'Current Route', defaultVisible: true, minW: 2, minH: 2 },
+  { id: 'pilots', title: 'Pilots', defaultVisible: true, minW: 2, minH: 3 },
+  { id: 'kills', title: 'Kills', defaultVisible: true, minW: 2, minH: 3 },
+  { id: 'dscan', title: 'D-Scan', defaultVisible: true, minW: 2, minH: 3 },
   { id: 'intel', title: 'Intel', defaultVisible: true, minW: 1, minH: 2 },
   { id: 'structure', title: 'Structures', defaultVisible: true, minW: 2, minH: 2 },
   { id: 'killStats', title: 'Kill Statistics', defaultVisible: true, minW: 1, minH: 2 },
@@ -124,10 +128,10 @@ type ExperimentalRightGroup = { id: PanelId; anchor: PanelId; h: number };
 const EXPERIMENTAL_RIGHT_STACK: ExperimentalRightGroup[] = [
   { id: 'inspector', anchor: 'inspector', h: 5 },
   { id: 'route', anchor: 'route', h: 4 },
-  { id: 'systemKillboard', anchor: 'systemKillboard', h: 4 },
+  { id: 'pilots', anchor: 'pilots', h: 4 },
   { id: 'thera', anchor: 'thera', h: 4 },
   { id: 'systemGraph', anchor: 'systemGraph', h: 4 },
-  { id: 'structure', anchor: 'structure', h: 3 },
+  { id: 'structure', anchor: 'structure', h: 2 },
 ];
 
 function experimentalWideLayout(cols: number) {
@@ -164,10 +168,10 @@ const experimentalGroupsLg: PanelGroup[] = [
   { id: 'canvas', members: ['canvas'], active: 'canvas' },
   { id: 'signatures', members: ['signatures'], active: 'signatures' },
   { id: 'inspector', members: ['inspector', 'intel'], active: 'inspector' },
-  { id: 'route', members: ['route'], active: 'route' },
-  { id: 'systemKillboard', members: ['systemKillboard', 'killStats'], active: 'systemKillboard' },
-  { id: 'thera', members: ['thera', 'sigSearch'], active: 'thera' },
-  { id: 'systemGraph', members: ['systemGraph', 'tags'], active: 'systemGraph' },
+  { id: 'route', members: ['route', 'currentRoute'], active: 'route' },
+  { id: 'pilots', members: ['pilots', 'kills'], active: 'pilots' },
+  { id: 'thera', members: ['thera', 'dscan'], active: 'thera' },
+  { id: 'systemGraph', members: ['systemGraph', 'systemKillboard', 'tags'], active: 'systemGraph' },
   { id: 'structure', members: ['structure'], active: 'structure' },
 ];
 

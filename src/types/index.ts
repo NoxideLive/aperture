@@ -715,13 +715,17 @@ export type PanelId =
   | 'sigSearch'
   | 'inspector'
   | 'route'
+  | 'currentRoute'
   | 'intel'
   | 'structure'
   | 'killStats'
   | 'systemGraph'
   | 'systemKillboard'
   | 'tags'
-  | 'thera';
+  | 'thera'
+  | 'pilots'
+  | 'kills'
+  | 'dscan';
 
 /** Responsive breakpoint keys. Each holds an independent arrangement. */
 export type Breakpoint = 'lg' | 'md' | 'sm';
@@ -750,12 +754,38 @@ export interface PanelGroup {
  * group on load, so new panels need no data migration. `hidden` is the flat,
  * breakpoint-independent set the user removed from the grid.
  */
+export type ExperimentalLayoutPreset = 'scanning' | 'combat' | 'travel';
+
 export interface MapLayoutConfig {
   version: number;
   layouts: Record<Breakpoint, Layout>;
   groups: Record<Breakpoint, PanelGroup[]>;
   hidden: PanelId[];
+  /** Experimental BUILD 2: per-panel settings persisted with layout. */
+  panelSettings?: Partial<Record<PanelId, Record<string, unknown>>>;
+  layoutPreset?: ExperimentalLayoutPreset;
 }
+
+/** Map-scoped route favourite (experimental). */
+export type MapRouteFavouriteView = {
+  id: string;
+  systemId: number;
+  name: string;
+  security: string | null;
+  label: string | null;
+  shared: boolean;
+  ownedByViewer: boolean;
+};
+
+/** Active route row for the Current Route panel. */
+export type MapActiveRouteView = {
+  id: string;
+  destinationSystemId: number;
+  destinationName: string;
+  followerCharacterIds: number[];
+  waypointCursor: number;
+  hops: RouteHop[];
+};
 
 /**
  * A layout blob as read from storage or an imported file, before normalisation:
