@@ -52,6 +52,8 @@ export interface MapLayoutGridProps {
   onTearOff?: (panel: PanelId, x: number, y: number) => void;
   /** One element per visible group, each keyed by its group id. */
   children: ReactNode;
+  /** Experimental collapsed group ids — use a lower `minH` so header-only height applies. */
+  experimentalCollapsedGroupIds?: ReadonlySet<string>;
 }
 
 export function MapLayoutGrid({
@@ -60,6 +62,7 @@ export function MapLayoutGrid({
   onBreakpointChange,
   onTearOff,
   children,
+  experimentalCollapsedGroupIds,
 }: MapLayoutGridProps) {
   // ResizeObserver-based width (replaces the SSR-hostile WidthProvider). `mounted`
   // gates the grid until a real width is measured, avoiding a hydration flash.
@@ -157,11 +160,17 @@ export function MapLayoutGrid({
     for (const bp of Object.keys(layouts) as Breakpoint[]) {
       out[bp] = layouts[bp].map((item) => {
         const min = PANEL_MIN[item.i as PanelId];
-        return min ? { ...item, minW: min.minW, minH: min.minH } : item;
+        if (!min) return item;
+        const collapsed = experimentalCollapsedGroupIds?.has(item.i);
+        return {
+          ...item,
+          minW: min.minW,
+          minH: collapsed ? 1 : min.minH,
+        };
       });
     }
     return out;
-  }, [layouts]);
+  }, [layouts, experimentalCollapsedGroupIds]);
 
   return (
     <div ref={setContainerRefs} className="ap-map-dashboard relative h-full w-full">
