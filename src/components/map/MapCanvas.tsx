@@ -2600,7 +2600,7 @@ export function MapCanvas({
                 <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
-              {experimentalActive && <ExperimentalRallyNotify mapId={mapId} />}
+              {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
               <SignaturePasteHotkey
                 mapId={mapId}
                 selectedSystem={selectedSystem}

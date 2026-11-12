@@ -38,6 +38,12 @@ import {
 import { useExperimentalHoverDelayContext } from '@/lib/experimentalHoverDelay.client';
 import { isExperimentalUiActive } from '@/lib/experimentalUi';
 import {
+  readExperimentalRallyDesktopNotification,
+  readExperimentalRallyToast,
+  writeExperimentalRallyDesktopNotification,
+  writeExperimentalRallyToast,
+} from '@/lib/experimentalAlertPrefs';
+import {
   readExperimentalPointerCursor,
   readKeepMapSelection,
   readPastePreviewOnCtrlV,
@@ -106,6 +112,8 @@ export function AccountSettingsDialog({
   const [keepSelection, setKeepSelection] = useState(readKeepMapSelection);
   const [pointerCursor, setPointerCursor] = useState(readExperimentalPointerCursor);
   const [pastePreview, setPastePreview] = useState(readPastePreviewOnCtrlV);
+  const [rallyToast, setRallyToast] = useState(readExperimentalRallyToast);
+  const [rallyDesktop, setRallyDesktop] = useState(readExperimentalRallyDesktopNotification);
 
   // Signature-indicator prefs. The threshold is edited in hours; blank ⇒ use the
   // corp default. The override can never exceed the global cap (server-enforced).
@@ -397,6 +405,40 @@ export function AccountSettingsDialog({
                     }}
                   />
                   Preview signature paste (coming: opens diff dialog)
+                </label>
+              </div>
+            ) : null}
+            {experimentalOn ? (
+              <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
+                <p className="text-sm font-medium text-foreground">Experimental alerts</p>
+                <p className="text-xs text-muted-foreground">Off by default. Stored on this device.</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={rallyToast}
+                    onChange={(e) => {
+                      setRallyToast(e.target.checked);
+                      writeExperimentalRallyToast(e.target.checked);
+                    }}
+                  />
+                  Rally toast
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={rallyDesktop}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setRallyDesktop(on);
+                      writeExperimentalRallyDesktopNotification(on);
+                      if (on && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                        void Notification.requestPermission();
+                      }
+                    }}
+                  />
+                  Rally desktop notification
                 </label>
               </div>
             ) : null}
