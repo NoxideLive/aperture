@@ -152,7 +152,7 @@ export function MapPanelGroup({
         className={cn(
           PANEL_DRAG_HANDLE_CLASS,
           'flex shrink-0 cursor-move items-center gap-1.5 border-b px-2 py-1.5',
-          isMergeTarget && 'bg-accent ring-2 ring-inset ring-primary',
+          isMergeTarget && 'ap-panel-merge-target bg-accent ring-2 ring-inset ring-primary',
         )}
       >
         <GripVertical

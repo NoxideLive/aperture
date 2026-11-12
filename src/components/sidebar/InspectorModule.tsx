@@ -48,6 +48,8 @@ import { systemDisplayName } from '@/lib/eve/drifterSystems';
 import { NoteContent } from '@/components/map/NoteContent';
 import { NOTE_TEXT_COLOR_NAMES } from '@/lib/map/noteMarkdown';
 import { apertureConfig } from '../../../aperture.config';
+import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experimentalUi';
+import { ExperimentalMapSummary } from './ExperimentalMapSummary';
 
 const NONE_JUMP_MASS = '__none__';
 
@@ -68,7 +70,13 @@ export function InspectorModule(props: {
 }) {
   const { selected, viewData } = props;
 
-  if (!selected) return <EmptyInspector />;
+  if (!selected) {
+  return isExperimentalUiActive(readExperimentalUiFromHtml()) ? (
+      <ExperimentalMapSummary viewData={viewData} />
+    ) : (
+      <EmptyInspector />
+    );
+  }
 
   if (selected.kind === 'system') {
     const system = viewData.systems.find((s) => s.id === selected.id);

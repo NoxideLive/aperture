@@ -34,6 +34,7 @@ import type {
   PanelGroup,
   PanelId,
   RouteDestinationView,
+  RoutePlan,
   RoutePrefs,
   SignatureIndicatorPrefs,
   SigSearchFilters,
@@ -157,6 +158,7 @@ import { ExperimentalCombatRingProvider } from './ExperimentalCombatRingContext'
 import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
 import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
 import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
+import { ExperimentalUndoHotkeys } from './ExperimentalUndoHotkeys';
 import { SystemNotificationSoundBridge } from './SystemNotificationSoundBridge';
 import { WatchedConnectionSoundBridge } from './WatchedConnectionSoundBridge';
 import { SystemNode, type SystemNodeData } from './SystemNode';
@@ -607,6 +609,22 @@ export function MapCanvas({
       variant,
     };
   }, [experimentalActive, experimentalUi]);
+  const [routeHighlightConnectionIds, setRouteHighlightConnectionIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const onRoutePlanHighlight = useCallback((plan: RoutePlan | null) => {
+    if (!plan?.reachable) {
+      setRouteHighlightConnectionIds(new Set());
+      return;
+    }
+    setRouteHighlightConnectionIds(
+      new Set(
+        plan.hops
+          .filter((h) => h.connectionId != null)
+          .map((h) => String(h.connectionId)),
+      ),
+    );
+  }, []);
   const [layout, setLayout] = useState<MapLayoutConfig>(() => {
     const experimentalOnLoad = isExperimentalUiActive(initialExperimentalUi);
     const base =
@@ -2086,6 +2104,7 @@ export function MapCanvas({
           wormholeCode: wh?.code ?? null,
           onEndpointContextMenu,
           isOnHomePath: homePathEdges.has(c.id),
+          routeHighlighted: experimentalActive && routeHighlightConnectionIds.has(c.id),
         },
         selected: selected?.kind === 'connection' && selected.id === c.id,
       };
@@ -2097,6 +2116,8 @@ export function MapCanvas({
     selected,
     onEndpointContextMenu,
     homePathEdges,
+    experimentalActive,
+    routeHighlightConnectionIds,
   ]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
@@ -2571,6 +2592,7 @@ export function MapCanvas({
             systems={viewData.systems}
             connections={viewData.connections}
             signatures={viewData.signatures}
+            onPlanHighlight={experimentalActive ? onRoutePlanHighlight : undefined}
           />
         );
       case 'intel':
@@ -2664,6 +2686,7 @@ export function MapCanvas({
               )}
               {rallySetOn && <RallySoundBridge mapId={mapId} />}
               {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
+              {experimentalActive ? <ExperimentalUndoHotkeys /> : null}
               {experimentalActive ? (
                 <ExperimentalCombatSoundBridge mapId={mapId} systems={viewData.systems} />
               ) : null}

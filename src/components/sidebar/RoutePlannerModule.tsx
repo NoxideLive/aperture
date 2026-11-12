@@ -114,6 +114,7 @@ export function RoutePlannerModule({
   systems,
   connections,
   signatures,
+  onPlanHighlight,
 }: {
   mapId: string;
   selectedSystemId: number | null;
@@ -122,6 +123,8 @@ export function RoutePlannerModule({
   systems: MapSystemNode[];
   connections: MapConnectionEdge[];
   signatures: MapSignature[];
+  /** Experimental: highlight the first reachable plan on the map canvas. */
+  onPlanHighlight?: (plan: RoutePlan | null) => void;
 }) {
   const { activeCharSystemId } = useMapActiveChar();
 
@@ -216,6 +219,12 @@ export function RoutePlannerModule({
     // for the array/object deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapId, sourceSystemId, destKey, prefsKey, connectionsKey, signaturesKey, tagsKey]);
+
+  useEffect(() => {
+    if (!onPlanHighlight) return;
+    const first = plans.find((p) => p.reachable);
+    onPlanHighlight(first ?? null);
+  }, [plans, onPlanHighlight]);
 
   const updatePrefs = useCallback(
     (patch: Partial<RoutePrefs>) => {

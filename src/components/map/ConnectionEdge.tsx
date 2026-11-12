@@ -49,6 +49,8 @@ export type ConnectionEdgeData = MapConnectionEdge & {
   onEndpointContextMenu: (connectionId: string, end: ConnectionEnd, clientX: number, clientY: number) => void;
   /** BFS tree from Home (experimental link salience). */
   isOnHomePath?: boolean;
+  /** Experimental route planner path highlight. */
+  routeHighlighted?: boolean;
 };
 
 export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) {
@@ -177,7 +179,18 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
             far={sourceAnchor}
           />
         )}
-        <BaseEdge path={path} style={finalStyle} />
+        <BaseEdge
+          path={path}
+          style={
+            data.routeHighlighted
+              ? {
+                  ...finalStyle,
+                  strokeWidth: (finalStyle.strokeWidth ?? 2) + 1.5,
+                  filter: 'drop-shadow(0 0 3px rgb(56 189 248 / 0.75))',
+                }
+              : finalStyle
+          }
+        />
         <ConnectionEndpoint
           end="source"
           anchor={sourceAnchor}
