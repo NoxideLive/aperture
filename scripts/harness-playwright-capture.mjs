@@ -1,11 +1,22 @@
 #!/usr/bin/env node
 /**
- * Run via: pnpm dlx playwright@1.52.0 install chromium
- *          pnpm dlx playwright@1.52.0 node scripts/harness-playwright-capture.mjs [storageState] [outDir]
+ * Headless screenshots for BUILD 2 harness (:3005).
+ * Requires playwright installed beside this run, e.g.:
+ *   mkdir -p /tmp/harness-pw && cd /tmp/harness-pw && npm init -y && npm i playwright@1.52.0
+ *   HARNESS_PLAYWRIGHT_PATH=/tmp/harness-pw/node_modules playwright install chromium
+ *   NODE_PATH=/tmp/harness-pw/node_modules node scripts/harness-playwright-capture.mjs
  */
+import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium } from 'playwright';
+
+const require = createRequire(import.meta.url);
+const playwrightRoot =
+  process.env.HARNESS_PLAYWRIGHT_PATH ??
+  (process.env.NODE_PATH ? process.env.NODE_PATH.split(':')[0] : null);
+const { chromium } = playwrightRoot
+  ? require(join(playwrightRoot, 'playwright'))
+  : require('playwright');
 
 const storagePath = process.argv[2] ?? '/tmp/ap-harness.json';
 const outDir = process.argv[3] ?? '/opt/cursor/artifacts/real-ui/build2c';
