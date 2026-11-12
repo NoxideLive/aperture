@@ -38,6 +38,10 @@ import {
   removeRouteDestinationAction,
   setRoutePrefsAction,
 } from '@/app/(app)/actions/routes';
+import { addMapRouteFavouriteAction } from '@/app/(app)/actions/mapRouteFavourites';
+import { subscribeExperimentalPanelAdd } from '@/lib/experimentalPanelActionBus';
+import { setMapActiveRouteAction } from '@/app/(app)/actions/mapActiveRoute';
+import { pushKspaceWaypointsForCharacter } from '@/lib/character/pushRouteWaypoints';
 import { subscribeRouteDestinations } from '@/lib/map/routeDestinationBus';
 import type {
   MapConnectionEdge,
@@ -49,6 +53,7 @@ import type {
   RoutePlan,
   RoutePrefs,
   RouteSafety,
+  MapRouteFavouriteView,
   SystemSearchResult,
   WhJumpMass,
 } from '@/types';
@@ -115,6 +120,9 @@ export function RoutePlannerModule({
   connections,
   signatures,
   onPlanHighlight,
+  mapRouteFavourites,
+  activeCharacterId,
+  onActiveRouteSaved,
 }: {
   mapId: string;
   selectedSystemId: number | null;
@@ -125,8 +133,12 @@ export function RoutePlannerModule({
   signatures: MapSignature[];
   /** Experimental: highlight the first reachable plan on the map canvas. */
   onPlanHighlight?: (plan: RoutePlan | null) => void;
+  /** Experimental: per-map pinned favourites (personal + shared). */
+  mapRouteFavourites?: MapRouteFavouriteView[];
+  activeCharacterId?: number | null;
+  onActiveRouteSaved?: () => void;
 }) {
-  const { activeCharSystemId } = useMapActiveChar();
+  const { activeCharSystemId, activeCharId } = useMapActiveChar();
 
   const [prefs, setPrefs] = useState<RoutePrefs>(initialPrefs);
   // `updatePrefs` is the only writer, so this ref tracks the latest prefs without
@@ -137,6 +149,9 @@ export function RoutePlannerModule({
   const [plans, setPlans] = useState<RoutePlan[]>([]);
   const [computing, setComputing] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<ReadonlySet<number>>(() => new Set());
+  const [favourites, setFavourites] = useState<MapRouteFavouriteView[]>(
+    () => mapRouteFavourites ?? [],
+  );
   const [, startPrefs] = useTransition();
 
   const routeSource = useSyncExternalStore(
@@ -271,11 +286,81 @@ export function RoutePlannerModule({
     [],
   );
 
+  useEffect(
+    () =>
+      subscribeExperimentalPanelAdd('route', () => {
+        document.getElementById('route-add-destination-input')?.focus();
+      }),
+    [],
+  );
+
   const planBySystem = useMemo(() => {
     const m = new Map<number, RoutePlan>();
     for (const p of plans) m.set(p.destinationSystemId, p);
     return m;
   }, [plans]);
+
+  const pickFavourite = useCallback(
+    async (fav: MapRouteFavouriteView) => {
+      const fake: SystemSearchResult = {
+        id: fav.systemId,
+        name: fav.name,
+        security: fav.security,
+        securityStatus: null,
+        regionName: '',
+        constellationName: '',
+      };
+      await addDestination(fake);
+    },
+    [addDestination],
+  );
+
+  const pinFavourite = useCallback(
+    async (system: SystemSearchResult) => {
+      const result = await addMapRouteFavouriteAction({
+        mapId,
+        systemId: system.id,
+        label: system.name,
+        shared: false,
+      });
+      if (!result.ok) return;
+      setFavourites((prev) => {
+        const rest = prev.filter((f) => f.systemId !== result.data.systemId);
+        return [...rest, result.data];
+      });
+      toast.success('Pinned to map favourites');
+    },
+    [mapId],
+  );
+
+  const setActiveForPlan = useCallback(
+    async (plan: RoutePlan) => {
+      const charId = activeCharacterId ?? activeCharId;
+      if (!charId) {
+        toast.error('Pick an active character first.');
+        return;
+      }
+      const push = await pushKspaceWaypointsForCharacter(charId, plan.hops);
+      if (!push.ok) {
+        toast.error(push.error);
+        return;
+      }
+      const saved = await setMapActiveRouteAction({
+        mapId,
+        primaryCharacterId: charId,
+        destinationSystemId: plan.destinationSystemId,
+        plan,
+        followerCharacterIds: [charId],
+      });
+      if (!saved.ok) {
+        toast.error(saved.error);
+        return;
+      }
+      toast.success(`Active route set (${push.pushed} waypoint${push.pushed === 1 ? '' : 's'} pushed)`);
+      onActiveRouteSaved?.();
+    },
+    [activeCharacterId, activeCharId, mapId, onActiveRouteSaved],
+  );
 
   return (
     <Card size="sm">
@@ -390,6 +475,23 @@ export function RoutePlannerModule({
             </ToggleChip>
         </div>
 
+        {favourites.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {favourites.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] hover:bg-muted/40"
+                title={f.shared ? 'Shared favourite' : 'Personal favourite'}
+                onClick={() => void pickFavourite(f)}
+              >
+                {f.label ?? f.name}
+                {f.shared ? ' · shared' : ''}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {/* Destinations + routes */}
         <div className="flex flex-col gap-2">
           {destinations.length === 0 ? (
@@ -405,6 +507,14 @@ export function RoutePlannerModule({
                 expanded={expandedSteps.has(dest.id)}
                 onToggle={() => toggleSteps(dest.id)}
                 onRemove={() => removeDestination(dest.id)}
+                onSetActive={
+                  onPlanHighlight && planBySystem.get(dest.systemId)?.reachable
+                    ? () => {
+                        const plan = planBySystem.get(dest.systemId);
+                        if (plan?.reachable) void setActiveForPlan(plan);
+                      }
+                    : undefined
+                }
               />
             ))
           )}
@@ -416,6 +526,15 @@ export function RoutePlannerModule({
             clearOnPick
             onPick={addDestination}
           />
+          {onPlanHighlight ? (
+            <SystemSearchField
+              mapId={mapId}
+              placeholder="Pin favourite…"
+              icon="search"
+              clearOnPick
+              onPick={(s) => void pinFavourite(s)}
+            />
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -461,6 +580,7 @@ function DestinationRow({
   expanded,
   onToggle,
   onRemove,
+  onSetActive,
 }: {
   dest: RouteDestinationView;
   plan: RoutePlan | undefined;
@@ -469,6 +589,7 @@ function DestinationRow({
   expanded: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  onSetActive?: () => void;
 }) {
   const segments = useMemo(() => (plan ? segmentRoute(plan) : []), [plan]);
 
@@ -523,14 +644,26 @@ function DestinationRow({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`Remove ${dest.name}`}
-        >
-          <X className="size-3.5" />
-        </button>
+        <span className="flex shrink-0 items-center gap-1">
+          {onSetActive ? (
+            <button
+              type="button"
+              onClick={onSetActive}
+              disabled={!plan?.reachable || stale}
+              className="text-[10px] text-primary hover:underline disabled:opacity-40"
+            >
+              Set route
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive"
+            aria-label={`Remove ${dest.name}`}
+          >
+            <X className="size-3.5" />
+          </button>
+        </span>
       </div>
       <RouteBreadcrumb plan={plan} computing={computing} hasSource={sourceSystemId != null} />
       {expanded && segments.length > 0 && (
@@ -666,6 +799,7 @@ function SystemSearchField({
         <Loader2 className="absolute top-1/2 right-2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
       )}
       <Input
+        id={placeholder.startsWith('Add destination') ? 'route-add-destination-input' : undefined}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
