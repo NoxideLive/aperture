@@ -7,11 +7,11 @@
 
 **Props:** `open`, `onOpenChange`, `actions` (`MapCommandAction[]`), optional `resolveQueryActions(query)` for query-driven rows (prepended when the filter is non-empty).
 
-**Renders:** A dialog with a filter field and a scrollable list of commands; Enter runs the first match.
+**Renders:** A dialog with a filter field and a scrollable list of commands; Enter runs the first match. Closing the dialog (Esc, outside click, after a command, or `Ctrl/Cmd+K` toggle) clears the filter so the next open starts empty.
 
 ### `useMapCommandPaletteKeyboard(...)`
 
-Registers document-level shortcuts when `enabled`: `Ctrl/Cmd+K` opens the palette, `?` opens it, `f` fits the map view, `1`–`4` focus panels, `Esc` closes. Ignores keys while focus is in an editable field.
+Registers document-level shortcuts when `enabled`: `Ctrl/Cmd+K` toggles the palette (including while the palette search field is focused), `?` opens it, `f` fits the map view, `1`–`4` focus panels, `Esc` closes. Other shortcuts are ignored while focus is in an editable field.
 
 ### `MapCommandAction`
 

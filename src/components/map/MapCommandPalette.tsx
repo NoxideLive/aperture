@@ -41,6 +41,12 @@ export function MapCommandPalette({
 }) {
   const [query, setQuery] = useState('');
 
+  useEffect(() => {
+    if (!open) {
+      setQuery('');
+    }
+  }, [open]);
+
   const filtered = useMemo(() => {
     const raw = query.trim();
     const q = raw.toLowerCase();
@@ -62,13 +68,7 @@ export function MapCommandPalette({
   );
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) setQuery('');
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg gap-3 p-4">
         <DialogHeader className="gap-1">
           <DialogTitle>Command palette</DialogTitle>
@@ -115,12 +115,14 @@ export function MapCommandPalette({
 
 export function useMapCommandPaletteKeyboard({
   enabled,
+  open,
   actions,
   onOpenChange,
   onFitView,
   onFocusPanel,
 }: {
   enabled: boolean;
+  open: boolean;
   actions: MapCommandAction[];
   onOpenChange: (open: boolean) => void;
   onFitView: () => void;
@@ -129,12 +131,12 @@ export function useMapCommandPaletteKeyboard({
   useEffect(() => {
     if (!enabled) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditable(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        onOpenChange(true);
+        onOpenChange(!open);
         return;
       }
+      if (isEditable(e.target)) return;
       if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         onOpenChange(true);
@@ -156,5 +158,5 @@ export function useMapCommandPaletteKeyboard({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enabled, onFitView, onFocusPanel, onOpenChange, actions]);
+  }, [enabled, open, onFitView, onFocusPanel, onOpenChange, actions]);
 }

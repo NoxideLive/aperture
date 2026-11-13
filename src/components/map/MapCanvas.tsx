@@ -2907,6 +2907,7 @@ export function MapCanvas({
 
   useMapCommandPaletteKeyboard({
     enabled: experimentalActive,
+    open: commandOpen,
     actions: commandActions,
     onOpenChange: setCommandOpen,
     onFitView: fitMapView,
