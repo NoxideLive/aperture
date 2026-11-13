@@ -6,7 +6,13 @@ import type { MapConnectionEdge } from '@/lib/map/loadMap';
 import type { ConnectionEnd } from '@/types';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Eye, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
-import { connectionBadges, connectionStyle, experimentalEolOutlineClass } from './styling';
+import {
+  connectionBadges,
+  connectionStyle,
+  EOL_URGENCY_COLORS,
+  experimentalEolOutlineClass,
+  experimentalEolOutlineClassFromUrgency,
+} from './styling';
 import { useMapStyleOptions } from './MapStyleContext';
 import { useTravelForConnection } from './MapTravelContext';
 import { useIsConnectionWatched } from '@/lib/connectionWatchPrefs';
@@ -16,7 +22,11 @@ import { ConnectionBubble } from './ConnectionBubble';
 import { ConnectionEndpoint, type ConnectionEndpointState } from './ConnectionEndpoint';
 import { useMapLinkHover, useSetMapLinkHover } from './MapLinkHoverContext';
 import { SIGNATURE_DRAG_MIME } from '@/lib/experimentalSignatureUndo';
-import { connectionTimeLeftMs, formatEolTimeLeftTag } from '@/lib/map/connectionState';
+import {
+  connectionTimeLeftMs,
+  eolDisplayUrgency,
+  formatEolTimeLeftTag,
+} from '@/lib/map/connectionState';
 import { useMapMinuteTick } from '@/lib/map/eolMinuteTick';
 
 // Selectable connection edge. Scope + mass status drive the stroke colour; EOL
@@ -131,19 +141,40 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
     finalStyle = { ...finalStyle, strokeOpacity: Math.min(1, base * 1.28) };
   }
   const minuteNow = useMapMinuteTick();
+  const eolLiveCountdown =
+    data.eolStage === 'eol' || data.eolStage === 'critical'
+      ? connectionTimeLeftMs(data, minuteNow)
+      : null;
+  const eolUrgency = importance ? eolDisplayUrgency(data.eolStage, eolLiveCountdown) : null;
+  const eolOutlineClass = importance
+    ? experimentalEolOutlineClassFromUrgency(eolUrgency) ??
+      (eolLiveCountdown == null ? experimentalEolOutlineClass(data.eolStage) : null)
+    : null;
+
   const badges = useMemo(() => {
     const base = connectionBadges(data, styleOpts);
-    if (
-      !importance ||
-      (data.eolStage !== 'eol' && data.eolStage !== 'critical')
-    ) {
-      return base;
-    }
-    const left = connectionTimeLeftMs(data, minuteNow);
-    const countdown = left != null ? formatEolTimeLeftTag(left) : null;
-    if (!countdown) return base;
-    return base.map((b) => (b.key === 'eol' ? { ...b, label: countdown } : b));
-  }, [data, styleOpts, importance, minuteNow]);
+    if (!importance) return base;
+    const countdown =
+      eolLiveCountdown != null ? formatEolTimeLeftTag(eolLiveCountdown) : null;
+    const showLiveEol =
+      data.eolStage === 'eol' ||
+      data.eolStage === 'critical' ||
+      data.eolStage === 'expired';
+    if (!showLiveEol) return base;
+    if (!countdown && eolUrgency == null) return base;
+    return base.map((b) => {
+      if (b.key !== 'eol') return b;
+      const urgency =
+        eolUrgency ??
+        (data.eolStage === 'critical' || data.eolStage === 'expired' ? 'critical' : 'warning');
+      return {
+        ...b,
+        tone: data.eolStage === 'expired' && urgency === 'critical' ? undefined : b.tone,
+        ...(countdown ? { label: countdown } : {}),
+        eolUrgency: urgency,
+      };
+    });
+  }, [data, styleOpts, importance, eolLiveCountdown, eolUrgency]);
   const watched = useIsConnectionWatched(data.mapId, props.id);
   const hasLabel = badges.length > 0 || data.isRolling || data.preserveMass || watched;
   const travel = useTravelForConnection(props.id);
@@ -185,11 +216,11 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
           data.onSignatureLinkDrop(props.id, sigId);
         }}
       >
-        {importance && experimentalEolOutlineClass(data.eolStage) ? (
+        {eolOutlineClass ? (
           <path
             d={path}
             fill="none"
-            className={`${experimentalEolOutlineClass(data.eolStage)} pointer-events-none`}
+            className={`${eolOutlineClass} pointer-events-none`}
             vectorEffect="non-scaling-stroke"
           />
         ) : null}
@@ -302,6 +333,17 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
                           key={b.key}
                           className="rounded-sm bg-amber-400 px-1 py-px font-bold text-black"
                           aria-label="Small connection — frigate-size ships only"
+                        >
+                          {b.label}
+                        </span>
+                      ) : b.eolUrgency ? (
+                        <span
+                          key={b.key}
+                          className="rounded-sm border px-1 py-px font-medium"
+                          style={{
+                            color: EOL_URGENCY_COLORS[b.eolUrgency].text,
+                            borderColor: EOL_URGENCY_COLORS[b.eolUrgency].border,
+                          }}
                         >
                           {b.label}
                         </span>

@@ -15,6 +15,8 @@
 | connections | MapConnectionEdge[] | yes | The map's live connections; drives recompute when the chain changes. |
 | signatures | MapSignature[] | yes | The map's live signatures; drives recompute when a connection-bound sig changes. |
 | onPlanHighlight | (plan: RoutePlan \| null) => void | no | Experimental: pushes the highlighted plan to `MapCanvas` for edge/system glow. |
+| planHighlightSuppressed | boolean | no | Experimental: clears map highlight and skips auto-pick until the user selects a plan again (Current Route **Stop**). |
+| onPlanHighlightEngaged | () => void | no | Experimental: notifies the parent to resume planner-driven highlight after the user picks a destination plan. |
 | onHopClick | (eveSystemId: number) => void | no | Experimental: pan/zoom to an on-map hop via `MapCanvas`. |
 | mapRouteFavourites | MapRouteFavouriteView[] | no | Experimental per-map favourites. |
 | activeCharacterId | number \| null | no | Primary character for ESI waypoint push. |

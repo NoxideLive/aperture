@@ -151,6 +151,8 @@ export function RoutePlannerModule({
   connections,
   signatures,
   onPlanHighlight,
+  planHighlightSuppressed = false,
+  onPlanHighlightEngaged,
   mapRouteFavourites,
   activeCharacterId,
   viewerCharacters = [],
@@ -171,6 +173,9 @@ export function RoutePlannerModule({
   signatures: MapSignature[];
   /** Experimental: highlight the first reachable plan on the map canvas. */
   onPlanHighlight?: (plan: RoutePlan | null) => void;
+  /** Experimental: after Stop on Current Route, suppress auto-highlight until the user picks a plan again. */
+  planHighlightSuppressed?: boolean;
+  onPlanHighlightEngaged?: () => void;
   /** Experimental: pan/zoom + highlight an on-map hop.systemId (EVE id). */
   onHopClick?: (eveSystemId: number) => void;
   /** Experimental: per-map pinned favourites (personal + shared). */
@@ -333,13 +338,17 @@ export function RoutePlannerModule({
 
   useEffect(() => {
     if (!onPlanHighlight) return;
+    if (planHighlightSuppressed) {
+      onPlanHighlight(null);
+      return;
+    }
     if (highlightedPlan?.reachable) {
       onPlanHighlight(highlightedPlan);
       return;
     }
     const first = plans.find((p) => p.reachable);
     onPlanHighlight(first ?? null);
-  }, [plans, onPlanHighlight, highlightedPlan]);
+  }, [plans, onPlanHighlight, highlightedPlan, planHighlightSuppressed]);
 
   const compareDestId = destinations[0]?.systemId ?? null;
 
@@ -789,7 +798,10 @@ export function RoutePlannerModule({
                           type="button"
                           className="flex w-full items-center justify-between gap-2 rounded border border-border/40 px-2 py-1 text-left hover:bg-muted/40"
                           onClick={() => {
-                            if (row.plan.reachable) setHighlightedPlan(row.plan);
+                            if (row.plan.reachable) {
+                              setHighlightedPlan(row.plan);
+                              onPlanHighlightEngaged?.();
+                            }
                           }}
                         >
                           <span className="truncate">{row.originName}</span>

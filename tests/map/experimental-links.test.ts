@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { connectionStyle, experimentalEolOutlineClass } from '@/components/map/styling';
+import {
+  connectionStyle,
+  experimentalEolOutlineClass,
+  experimentalEolOutlineClassFromUrgency,
+} from '@/components/map/styling';
 import { homePathConnectionIds } from '@/lib/map/homePath';
 
 describe('connectionStyle importance', () => {
@@ -27,11 +31,21 @@ describe('connectionStyle importance', () => {
 });
 
 describe('experimentalEolOutlineClass', () => {
-  it('distinguishes eol vs critical and skips expired', () => {
+  it('distinguishes eol vs critical and maps expired to red', () => {
     expect(experimentalEolOutlineClass('eol')).toContain('ap-connection-eol-stage-eol');
     expect(experimentalEolOutlineClass('critical')).toContain('ap-connection-eol-stage-critical');
-    expect(experimentalEolOutlineClass('expired')).toBeNull();
+    expect(experimentalEolOutlineClass('expired')).toContain('ap-connection-eol-stage-critical');
     expect(experimentalEolOutlineClass('none')).toBeNull();
+  });
+});
+
+describe('experimentalEolOutlineClassFromUrgency', () => {
+  it('maps live urgency to orange or red outline classes', () => {
+    expect(experimentalEolOutlineClassFromUrgency('warning')).toContain('ap-connection-eol-stage-eol');
+    expect(experimentalEolOutlineClassFromUrgency('critical')).toContain(
+      'ap-connection-eol-stage-critical',
+    );
+    expect(experimentalEolOutlineClassFromUrgency(null)).toBeNull();
   });
 });
 

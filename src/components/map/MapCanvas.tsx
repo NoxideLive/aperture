@@ -179,7 +179,7 @@ import {
   toggleSystemMuteEvent,
   type ExperimentalSoundLayoutSettings,
 } from '@/lib/experimentalSoundLayout';
-import { remainingActiveRouteHops } from '@/lib/map/activeRouteMonitor';
+import { activeRouteConnectionIds, remainingActiveRouteHops } from '@/lib/map/activeRouteMonitor';
 import type { SoundEvent } from '@/lib/sounds/prefs';
 import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
 import { ExperimentalUndoHotkeys } from './ExperimentalUndoHotkeys';
@@ -717,10 +717,32 @@ export function MapCanvas({
     () => new Set(),
   );
   const [routeFocusMapSystemId, setRouteFocusMapSystemId] = useState<string | null>(null);
+  const [activeRouteLocallyCleared, setActiveRouteLocallyCleared] = useState(false);
+  const [planHighlightSuppressed, setPlanHighlightSuppressed] = useState(false);
   const router = useRouter();
   const [pilotHoverSystemId, setPilotHoverSystemId] = useState<string | null>(null);
   const [signatureHoverFarSystemId, setSignatureHoverFarSystemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveRouteLocallyCleared(false);
+    setPlanHighlightSuppressed(false);
+  }, [mapActiveRoute?.id]);
+
+  useEffect(() => {
+    if (!experimentalActive || activeRouteLocallyCleared || !mapActiveRoute) return;
+    const byEve = new Map(viewData.systems.map((s) => [s.systemId, s.id]));
+    setRouteHighlightConnectionIds(new Set(activeRouteConnectionIds(mapActiveRoute.hops)));
+    setRouteHighlightMapSystemIds(
+      new Set(
+        mapActiveRoute.hops
+          .map((h) => byEve.get(h.systemId))
+          .filter((id): id is string => id != null),
+      ),
+    );
+  }, [experimentalActive, mapActiveRoute, activeRouteLocallyCleared, viewData.systems]);
+
   const onRoutePlanHighlight = useCallback((plan: RoutePlan | null) => {
+    if (mapActiveRoute && !activeRouteLocallyCleared) return;
     if (!plan?.reachable) {
       setRouteHighlightConnectionIds(new Set());
       setRouteHighlightMapSystemIds(new Set());
@@ -741,7 +763,7 @@ export function MapCanvas({
           .filter((id): id is string => id != null),
       ),
     );
-  }, [viewData.systems]);
+  }, [viewData.systems, mapActiveRoute, activeRouteLocallyCleared]);
 
   const focusMapSystemByEveId = useCallback(
     (eveSystemId: number) => {
@@ -1394,6 +1416,11 @@ export function MapCanvas({
       return;
     }
     toast.success('Active route stopped.');
+    setActiveRouteLocallyCleared(true);
+    setPlanHighlightSuppressed(true);
+    setRouteHighlightConnectionIds(new Set());
+    setRouteHighlightMapSystemIds(new Set());
+    setRouteFocusMapSystemId(null);
     router.refresh();
   }, [mapId, router]);
 
@@ -3084,6 +3111,10 @@ export function MapCanvas({
             connections={viewData.connections}
             signatures={viewData.signatures}
             onPlanHighlight={experimentalActive ? onRoutePlanHighlight : undefined}
+            planHighlightSuppressed={experimentalActive ? planHighlightSuppressed : undefined}
+            onPlanHighlightEngaged={
+              experimentalActive ? () => setPlanHighlightSuppressed(false) : undefined
+            }
             onHopClick={experimentalActive ? focusMapSystemByEveId : undefined}
             mapRouteFavourites={experimentalActive ? mapRouteFavourites : undefined}
             viewerCharacters={experimentalActive ? viewerCharacters : []}

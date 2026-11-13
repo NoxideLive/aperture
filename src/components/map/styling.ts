@@ -306,14 +306,30 @@ function importanceWhFresh(opts: MapStyleOptions | undefined) {
   return theme === 'light' ? IMPORTANCE_WH_FRESH_LIGHT : IMPORTANCE_WH_FRESH_DARK;
 }
 
-/** Experimental-only purple outline classes by `eolStage` (mass stays on the base path). */
+/** Experimental outline classes when only the stored stage is known (fallback). */
 export function experimentalEolOutlineClass(
   eolStage: MapConnectionEdge['eolStage'],
 ): string | null {
   if (eolStage === 'eol') return 'ap-connection-eol-outline ap-connection-eol-stage-eol';
-  if (eolStage === 'critical') return 'ap-connection-eol-outline ap-connection-eol-stage-critical';
+  if (eolStage === 'critical' || eolStage === 'expired') {
+    return 'ap-connection-eol-outline ap-connection-eol-stage-critical';
+  }
   return null;
 }
+
+/** Experimental outline from live countdown urgency (`warning` orange, `critical` red). */
+export function experimentalEolOutlineClassFromUrgency(
+  urgency: 'warning' | 'critical' | null,
+): string | null {
+  if (urgency === 'critical') return 'ap-connection-eol-outline ap-connection-eol-stage-critical';
+  if (urgency === 'warning') return 'ap-connection-eol-outline ap-connection-eol-stage-eol';
+  return null;
+}
+
+export const EOL_URGENCY_COLORS = {
+  warning: { text: '#f97316', border: '#f97316' },
+  critical: { text: '#ef4444', border: '#ef4444' },
+} as const;
 
 function connectionImportanceStyle(
   edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
@@ -425,6 +441,8 @@ export type ConnectionBadge = {
    * marker (do not jump).
    */
   tone?: 'warn' | 'danger';
+  /** Live EOL countdown urgency for tag border + text colour. */
+  eolUrgency?: 'warning' | 'critical';
 };
 
 /**

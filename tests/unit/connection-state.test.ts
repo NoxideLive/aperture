@@ -4,6 +4,8 @@ import {
   connectionExpiredSinceMs,
   connectionExpiresAt,
   connectionTimeLeftMs,
+  eolDisplayUrgency,
+  eolTimeUrgencyFromMs,
   formatEolTimeLeftTag,
   type ConnectionLifecycleInput,
 } from '@/lib/map/connectionState';
@@ -106,6 +108,24 @@ describe('connectionTimeLeftMs', () => {
   it('uses the 1h nominal once the critical stage is flagged', () => {
     const remaining = connectionTimeLeftMs(wh({ eolStage: 'critical', eolAt: EOL }), EOL_MS + 1_000);
     expect(remaining).toBe(WORMHOLE_EOL_CRITICAL_NOMINAL_MS - 1_000);
+  });
+});
+
+describe('eolTimeUrgencyFromMs', () => {
+  it('maps countdown to orange then red thresholds', () => {
+    expect(eolTimeUrgencyFromMs(2 * 3_600_000)).toBe('warning');
+    expect(eolTimeUrgencyFromMs(WORMHOLE_EOL_CRITICAL_NOMINAL_MS)).toBe('critical');
+    expect(eolTimeUrgencyFromMs(WORMHOLE_EOL_CRITICAL_NOMINAL_MS + 60_000)).toBe('warning');
+    expect(eolTimeUrgencyFromMs(WORMHOLE_EOL_NOMINAL_MS)).toBeNull();
+    expect(eolTimeUrgencyFromMs(0)).toBe('critical');
+  });
+});
+
+describe('eolDisplayUrgency', () => {
+  it('treats expired stage and zero countdown as critical', () => {
+    expect(eolDisplayUrgency('expired', null)).toBe('critical');
+    expect(eolDisplayUrgency('critical', 0)).toBe('critical');
+    expect(eolDisplayUrgency('none', 0)).toBeNull();
   });
 });
 
