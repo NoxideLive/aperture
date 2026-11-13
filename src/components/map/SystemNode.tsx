@@ -13,6 +13,7 @@ import {
   ArrowDown,
   ArrowUp,
   Lock,
+  VolumeX,
   Radiation,
   Signal,
   Swords,
@@ -71,6 +72,8 @@ export type SystemNodeData = MapSystemNode & {
   onPanelHoverSync?: (mapSystemId: string | null) => void;
   /** Experimental: active route path or hop focus on the map. */
   routePathLinked?: boolean;
+  /** Experimental: per-system sound mute from saved layout. */
+  soundMuted?: boolean;
 };
 
 function securityLabel(node: MapSystemNode): string {
@@ -303,6 +306,9 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
               <Home className="size-3" style={{ color: home }} aria-label="Home system" />
             )}
             {data.locked && <Lock className="size-3 text-muted-foreground" />}
+            {experimentalUi && data.soundMuted && (
+              <VolumeX className="size-3 text-muted-foreground" aria-label="Sounds muted" />
+            )}
           </div>
 
           <div className="flex items-center gap-1 px-2 text-[10px] text-muted-foreground">

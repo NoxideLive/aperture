@@ -2,7 +2,9 @@
 
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
 import { ContextMenu } from '@base-ui/react/context-menu';
-import { Plus, Radar, Scissors, StickyNote, Trash2, Unlink } from 'lucide-react';
+import { Plus, Radar, Scissors, StickyNote, Trash2, Unlink, VolumeX } from 'lucide-react';
+import { SOUND_EVENTS, type SoundEvent } from '@/lib/sounds/prefs';
+import { SOUND_EVENT_MENU_LABELS } from '@/lib/experimentalSoundLayout';
 
 import type {
   MapContextMenuTarget,
@@ -135,6 +137,7 @@ export function MapContextMenu({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  experimentalSound,
 }: {
   target: MapContextMenuTarget | null;
   onClose: () => void;
@@ -168,6 +171,12 @@ export function MapContextMenu({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
+  experimentalSound?: {
+    isMuted: boolean;
+    isEventMuted: (event: SoundEvent) => boolean;
+    onMuteAll: (mute: boolean) => void;
+    onToggleEventMute: (event: SoundEvent, muted: boolean) => void;
+  };
 }) {
   // A zero-size virtual element at the cursor point; recreated per render so the
   // rect tracks the current target's coordinates.
@@ -237,6 +246,7 @@ export function MapContextMenu({
               onAddNoteAt,
               onNotePatch,
               onNoteRemove,
+              experimentalSound,
             })}
           </MenuPrimitive.Popup>
         </MenuPrimitive.Positioner>
@@ -267,6 +277,7 @@ function renderItems({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  experimentalSound,
 }: {
   target: MapContextMenuTarget | null;
   onClose: () => void;
@@ -290,6 +301,12 @@ function renderItems({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
+  experimentalSound?: {
+    isMuted: boolean;
+    isEventMuted: (event: SoundEvent) => boolean;
+    onMuteAll: (mute: boolean) => void;
+    onToggleEventMute: (event: SoundEvent, muted: boolean) => void;
+  };
 }) {
   if (!target) return null;
 
@@ -331,6 +348,7 @@ function renderItems({
             onPingSystem(system.id);
             onClose();
           }}
+          experimentalSound={experimentalSound}
         />
       );
     }
@@ -459,6 +477,7 @@ function SystemItems({
   onDeleteSubchainPick,
   onPing,
   onClose,
+  experimentalSound,
 }: {
   system: MapSystemNode;
   systems: MapSystemNode[];
@@ -475,6 +494,12 @@ function SystemItems({
   onPing: () => void;
   /** Dismiss the menu — "Set destination" closes it itself (self-contained action). */
   onClose: () => void;
+  experimentalSound?: {
+    isMuted: boolean;
+    isEventMuted: (event: SoundEvent) => boolean;
+    onMuteAll: (mute: boolean) => void;
+    onToggleEventMute: (event: SoundEvent, muted: boolean) => void;
+  };
 }) {
   const isHome = homeMapSystemId === system.id;
   const hasHome = homeMapSystemId !== null;
@@ -506,6 +531,34 @@ function SystemItems({
       <MenuItem icon={<Radar className="size-3.5" />} onClick={onPing}>
         Ping
       </MenuItem>
+
+      {experimentalSound ? (
+        <>
+          <MenuItem
+            icon={<VolumeX className="size-3.5" />}
+            onClick={() => experimentalSound.onMuteAll(!experimentalSound.isMuted)}
+          >
+            {experimentalSound.isMuted ? 'Unmute sounds' : 'Mute sounds'}
+          </MenuItem>
+          <MenuSubmenu>
+            <MenuSubmenuTrigger inset>Mute notification types…</MenuSubmenuTrigger>
+            <MenuSubmenuContent>
+              {SOUND_EVENTS.map((event) => (
+                <MenuCheckboxItem
+                  key={event}
+                  checked={experimentalSound.isEventMuted(event)}
+                  onCheckedChange={(checked) =>
+                    experimentalSound.onToggleEventMute(event, checked === true)
+                  }
+                >
+                  {SOUND_EVENT_MENU_LABELS[event]}
+                </MenuCheckboxItem>
+              ))}
+            </MenuSubmenuContent>
+          </MenuSubmenu>
+          <MenuSeparator />
+        </>
+      ) : null}
 
       <SetDestinationItem system={system} onClose={onClose} />
 

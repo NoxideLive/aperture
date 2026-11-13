@@ -764,7 +764,10 @@ export interface MapLayoutConfig {
   groups: Record<Breakpoint, PanelGroup[]>;
   hidden: PanelId[];
   /** Experimental BUILD 2: per-panel settings persisted with layout. */
-  panelSettings?: Partial<Record<PanelId, Record<string, unknown>>>;
+  panelSettings?: Partial<Record<PanelId, Record<string, unknown>>> & {
+    /** Map-wide experimental sound prefs (mutes, follow pilot); not a panel id. */
+    sound?: Record<string, unknown>;
+  };
   layoutPreset?: ExperimentalLayoutPreset;
 }
 
