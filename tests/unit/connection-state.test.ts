@@ -4,6 +4,7 @@ import {
   connectionExpiredSinceMs,
   connectionExpiresAt,
   connectionTimeLeftMs,
+  formatEolTimeLeftTag,
   type ConnectionLifecycleInput,
 } from '@/lib/map/connectionState';
 
@@ -105,5 +106,13 @@ describe('connectionTimeLeftMs', () => {
   it('uses the 1h nominal once the critical stage is flagged', () => {
     const remaining = connectionTimeLeftMs(wh({ eolStage: 'critical', eolAt: EOL }), EOL_MS + 1_000);
     expect(remaining).toBe(WORMHOLE_EOL_CRITICAL_NOMINAL_MS - 1_000);
+  });
+});
+
+describe('formatEolTimeLeftTag', () => {
+  it('formats hours and minutes compactly', () => {
+    expect(formatEolTimeLeftTag(3 * 3_600_000 + 42 * 60_000)).toBe('3h 42m');
+    expect(formatEolTimeLeftTag(2 * 3_600_000)).toBe('2h');
+    expect(formatEolTimeLeftTag(45 * 60_000)).toBe('45m');
   });
 });

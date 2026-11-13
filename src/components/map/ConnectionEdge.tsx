@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 import type { MapConnectionEdge } from '@/lib/map/loadMap';
 import type { ConnectionEnd } from '@/types';
@@ -16,6 +16,8 @@ import { ConnectionBubble } from './ConnectionBubble';
 import { ConnectionEndpoint, type ConnectionEndpointState } from './ConnectionEndpoint';
 import { useMapLinkHover, useSetMapLinkHover } from './MapLinkHoverContext';
 import { SIGNATURE_DRAG_MIME } from '@/lib/experimentalSignatureUndo';
+import { connectionTimeLeftMs, formatEolTimeLeftTag } from '@/lib/map/connectionState';
+import { useMapMinuteTick } from '@/lib/map/eolMinuteTick';
 
 // Selectable connection edge. Scope + mass status drive the stroke colour; EOL
 // dashes the line; flags (jump-mass / EOL / frigate / rolling / preserve) render
@@ -128,7 +130,20 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
     const base = finalStyle.strokeOpacity ?? 1;
     finalStyle = { ...finalStyle, strokeOpacity: Math.min(1, base * 1.28) };
   }
-  const badges = connectionBadges(data, styleOpts);
+  const minuteNow = useMapMinuteTick();
+  const badges = useMemo(() => {
+    const base = connectionBadges(data, styleOpts);
+    if (
+      !importance ||
+      (data.eolStage !== 'eol' && data.eolStage !== 'critical')
+    ) {
+      return base;
+    }
+    const left = connectionTimeLeftMs(data, minuteNow);
+    const countdown = left != null ? formatEolTimeLeftTag(left) : null;
+    if (!countdown) return base;
+    return base.map((b) => (b.key === 'eol' ? { ...b, label: countdown } : b));
+  }, [data, styleOpts, importance, minuteNow]);
   const watched = useIsConnectionWatched(data.mapId, props.id);
   const hasLabel = badges.length > 0 || data.isRolling || data.preserveMass || watched;
   const travel = useTravelForConnection(props.id);

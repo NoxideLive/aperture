@@ -287,8 +287,8 @@ export type EdgeStyle = {
   strokeOpacity?: number;
 };
 
-const IMPORTANCE_WH_FRESH_DARK = { stroke: '#6b7280', width: 1.5, opacity: 0.32 };
-const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#64748b', width: 1.5, opacity: 0.28 };
+const IMPORTANCE_WH_FRESH_DARK = { stroke: '#9ca3af', width: 2, opacity: 0.38 };
+const IMPORTANCE_WH_FRESH_LIGHT = { stroke: '#94a3b8', width: 2, opacity: 0.34 };
 const IMPORTANCE_WH_REDUCED_DARK = { stroke: '#f59e0b', width: 2.5, opacity: 0.95 };
 const IMPORTANCE_WH_REDUCED_LIGHT = { stroke: '#b45309', width: 2.5, opacity: 1 };
 const IMPORTANCE_WH_CRITICAL_DARK = { stroke: '#ef4444', width: 4, opacity: 1 };
@@ -449,7 +449,7 @@ export function connectionBadges(
     });
   }
   if (edge.eolStage === 'expired') badges.push({ key: 'eol', label: 'EXPIRED', tone: 'danger' });
-  else if (edge.eolStage === 'critical') badges.push({ key: 'eol', label: 'EOL 1h' });
+  else if (edge.eolStage === 'critical') badges.push({ key: 'eol', label: 'EOL' });
   else if (edge.eolStage === 'eol') badges.push({ key: 'eol', label: 'EOL' });
   return badges;
 }

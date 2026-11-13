@@ -76,6 +76,16 @@ export function connectionTimeLeftMs(
  * - `c` — the connection lifecycle fields.
  * - `now` — clock to compare against (defaults to `Date.now()`; injectable for tests).
  */
+/** Compact tag for connection-edge EOL labels (e.g. `3h 42m`). */
+export function formatEolTimeLeftTag(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0m';
+  const totalMin = Math.floor(ms / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
+}
+
 export function connectionExpiredSinceMs(
   c: ConnectionLifecycleInput,
   now: number = Date.now(),

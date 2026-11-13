@@ -22,6 +22,11 @@ Wall-clock instant the connection expires, or `null` when no expiry applies.
 
 ---
 
+### formatEolTimeLeftTag(ms: number): string
+Compact countdown for connection-edge EOL tags (e.g. `3h 42m`).
+
+---
+
 ### connectionTimeLeftMs(c: ConnectionLifecycleInput, now?: number): number | null
 Milliseconds until `connectionExpiresAt(c)`. Returns `null` for non-expiring connections and `0` once past expiry (clamped, never negative). `now` defaults to `Date.now()` but is injectable for tests.
 
