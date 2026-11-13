@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   activeRouteConnectionIds,
   activeRouteHopSystemIds,
+  activeRouteProgressIndex,
   followersOffRoute,
   isOnActiveRoute,
+  remainingActiveRouteHops,
 } from '@/lib/map/activeRouteMonitor';
 import type { RouteHop } from '@/types';
 
@@ -52,6 +54,13 @@ describe('activeRouteMonitor', () => {
 
   it('collects wormhole connection ids', () => {
     expect(activeRouteConnectionIds(hops)).toEqual(['42']);
+  });
+
+  it('advances progress index to the pilot current system on-path', () => {
+    expect(activeRouteProgressIndex(hops, 0, 2)).toBe(1);
+    expect(remainingActiveRouteHops(hops, 0, 2)).toHaveLength(2);
+    expect(remainingActiveRouteHops(hops, 0, 2)[0]!.systemId).toBe(2);
+    expect(activeRouteProgressIndex(hops, 0, 99)).toBe(0);
   });
 
   it('lists off-route followers', () => {

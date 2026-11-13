@@ -36,7 +36,6 @@ import { systemSecurityColor } from '@/components/map/styling';
 import {
   formatRouteInstructions,
   routeSegmentTokens,
-  routeSpaceKind,
   segmentRoute,
 } from '@/lib/map/routeSegments';
 import { searchSystemsOnServer } from '@/lib/map/client';
@@ -71,6 +70,7 @@ import {
   TURNUR_SYSTEM_ID,
 } from '@/lib/map/experimentalRouteExit';
 import { summarizeRoutePlan } from '@/lib/map/experimentalRouteAnalysis';
+import { RouteHopBreadcrumb } from '@/components/sidebar/RouteHopMarkers';
 import type {
   MapConnectionEdge,
   MapSignature,
@@ -943,13 +943,7 @@ function RouteBreadcrumb({
     ) : null;
   }
   if (!plan.reachable) return <span className="text-destructive">No route found.</span>;
-  return (
-    <div className="flex flex-wrap items-center gap-[3px]">
-      {plan.hops.map((hop, i) => (
-        <HopSquare key={`${hop.systemId}-${i}`} hop={hop} onHopClick={onHopClick} />
-      ))}
-    </div>
-  );
+  return <RouteHopBreadcrumb hops={plan.hops} onHopClick={onHopClick} />;
 }
 
 /**
@@ -1111,63 +1105,6 @@ function InstructionToken({ token }: { token: RouteInstructionToken }) {
   }
   if (token.kind === 'sig') return <span className="font-mono">{token.text}</span>;
   return <>{token.text}</>;
-}
-
-const VIA_LABELS: Record<RouteHop['via'], string> = {
-  origin: 'Start',
-  gate: 'via gate',
-  wh: 'via wormhole',
-  jumpbridge: 'via jumpbridge',
-  eve_scout: 'via EVE-Scout',
-};
-
-/**
- * One route hop as a small security-coloured marker; system name on hover.
- * Wormhole (J-space) systems render as circles, K-space systems as squares.
- */
-function HopSquare({
-  hop,
-  onHopClick,
-}: {
-  hop: RouteHop;
-  onHopClick?: (eveSystemId: number) => void;
-}) {
-  const isWormhole = routeSpaceKind(hop.security, hop.name) === 'jspace';
-  const clickable = hop.onMap && onHopClick != null;
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger
-        render={<span />}
-        role={clickable ? 'button' : undefined}
-        tabIndex={clickable ? 0 : undefined}
-        onClick={clickable ? () => onHopClick!(hop.systemId) : undefined}
-        onKeyDown={
-          clickable
-            ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onHopClick!(hop.systemId);
-                }
-              }
-            : undefined
-        }
-        className={`size-3 shrink-0 ${isWormhole ? 'rounded-full' : ''} ${
-          clickable ? 'cursor-pointer ring-offset-1 hover:ring-2 hover:ring-primary/40' : ''
-        }`}
-        style={{ backgroundColor: systemSecurityColor(hop.security, hop.securityStatus) }}
-        aria-label={hop.name}
-      />
-      <Tooltip.Portal>
-        <Tooltip.Positioner sideOffset={4} side="top" align="center">
-          <Tooltip.Popup className="z-50 rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md">
-            {hop.tag && <span className="mr-1 font-mono text-muted-foreground">[{hop.tag}]</span>}
-            <span style={{ color: systemSecurityColor(hop.security, hop.securityStatus) }}>{hop.name}</span>
-            <span className="ml-1 text-muted-foreground">{VIA_LABELS[hop.via]}</span>
-          </Tooltip.Popup>
-        </Tooltip.Positioner>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  );
 }
 
 function ShortcutChip({

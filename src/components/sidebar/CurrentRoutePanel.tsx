@@ -2,17 +2,23 @@
 
 import { useMemo } from 'react';
 import type { MapActiveRouteView, MapViewData } from '@/types';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { systemSecurityColor } from '@/components/map/styling';
+import { remainingActiveRouteHops, activeRouteProgressIndex } from '@/lib/map/activeRouteMonitor';
+import { RouteHopBreadcrumb } from '@/components/sidebar/RouteHopMarkers';
 
 export function CurrentRoutePanel({
   activeRoute,
   viewData,
+  primaryCharacterId,
   onSetRoute,
+  onHopClick,
 }: {
   activeRoute: MapActiveRouteView | null;
   viewData: MapViewData;
+  primaryCharacterId: number | null;
   onSetRoute?: () => void;
+  onHopClick?: (eveSystemId: number) => void;
 }) {
   const presenceByChar = useMemo(() => {
     const m = new Map<number, MapViewData['presence'][number]>();
@@ -20,67 +26,94 @@ export function CurrentRoutePanel({
     return m;
   }, [viewData.presence]);
 
+  const primarySystemId =
+    primaryCharacterId != null ? presenceByChar.get(primaryCharacterId)?.systemId ?? null : null;
+
   if (!activeRoute) {
     return (
-      <div className="p-3 text-xs text-muted-foreground">
-        No active route. Plan a route and choose <strong>Set route</strong> to push ESI waypoints (k-space
-        legs only).
-      </div>
+      <Card className="h-full gap-0 py-0 ring-0">
+        <CardContent className="p-3 text-sm text-muted-foreground">
+          No active route. Plan a route and choose <strong className="text-foreground">Set route</strong> to push
+          ESI waypoints (k-space legs only).
+        </CardContent>
+      </Card>
     );
   }
-  const onMap = activeRoute.hops.filter((h) => h.onMap);
-  return (
-    <div className="flex flex-col gap-2 p-3 text-sm">
-      <div className="font-heading font-medium">
-        → {activeRoute.destinationName}
-        <span className="ml-2 text-xs text-muted-foreground">
-          {activeRoute.followerCharacterIds.length} follower(s)
-        </span>
-      </div>
-      <ul className="space-y-1 text-xs text-muted-foreground">
-        {activeRoute.followerCharacterIds.map((cid) => {
-          const p = presenceByChar.get(cid);
-          const sys = p
-            ? viewData.systems.find((s) => s.systemId === p.systemId)?.alias ??
-              viewData.systems.find((s) => s.systemId === p.systemId)?.name
-            : null;
-          return (
-            <li key={cid} className="flex gap-2">
-              <span className="text-foreground">{p?.characterName ?? `Char ${cid}`}</span>
-              <span className="truncate">{sys ?? '—'}</span>
-            </li>
-          );
-        })}
-      </ul>
-      <MotionStrip hops={onMap} />
-      {onSetRoute ? (
-        <Button type="button" size="sm" className="self-start" onClick={onSetRoute}>
-          Set route / refresh waypoints
-        </Button>
-      ) : null}
-      <p className="text-xs text-muted-foreground">
-        Waypoint cursor: {activeRoute.waypointCursor + 1} / {activeRoute.hops.length}
-      </p>
-    </div>
-  );
-}
 
-function MotionStrip({ hops }: { hops: MapActiveRouteView['hops'] }) {
+  const progressIndex = activeRouteProgressIndex(
+    activeRoute.hops,
+    activeRoute.waypointCursor,
+    primarySystemId,
+  );
+  const remainingHops = remainingActiveRouteHops(
+    activeRoute.hops,
+    activeRoute.waypointCursor,
+    primarySystemId,
+  );
+  const destHop = activeRoute.hops.at(-1);
+
   return (
-    <div className="flex flex-wrap gap-1">
-      {hops.map((h, i) => (
-        <span
-          key={`${h.systemId}-${i}`}
-          className="rounded px-1 py-0.5 text-[10px] font-medium"
-          style={{
-            backgroundColor: systemSecurityColor(h.security, h.securityStatus),
-            color: '#fff',
-          }}
-          title={h.name}
-        >
-          {h.tag ?? h.name.slice(0, 6)}
-        </span>
-      ))}
-    </div>
+    <Card className="h-full gap-0 py-0 ring-0">
+      <CardContent className="flex flex-col gap-2 p-3 text-sm">
+        <div className="flex flex-col gap-1 rounded-md border border-border/60 p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium">
+              <span className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    color: destHop
+                      ? systemSecurityColor(destHop.security, destHop.securityStatus)
+                      : undefined,
+                  }}
+                >
+                  {activeRoute.destinationName}
+                </span>
+                {remainingHops.length > 0 ? (
+                  <span className="font-mono text-muted-foreground">
+                    {Math.max(0, remainingHops.length - 1)}j
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {activeRoute.followerCharacterIds.length} follower
+                {activeRoute.followerCharacterIds.length === 1 ? '' : 's'}
+              </span>
+            </span>
+            {onSetRoute ? (
+              <button
+                type="button"
+                onClick={onSetRoute}
+                className="shrink-0 text-[10px] text-primary hover:underline"
+              >
+                Set route / refresh waypoints
+              </button>
+            ) : null}
+          </div>
+          <RouteHopBreadcrumb hops={remainingHops} onHopClick={onHopClick} />
+        </div>
+
+        {activeRoute.followerCharacterIds.length > 0 ? (
+          <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+            {activeRoute.followerCharacterIds.map((cid) => {
+              const p = presenceByChar.get(cid);
+              const sys = p
+                ? viewData.systems.find((s) => s.systemId === p.systemId)?.alias ??
+                  viewData.systems.find((s) => s.systemId === p.systemId)?.name
+                : null;
+              return (
+                <li key={cid} className="flex gap-2">
+                  <span className="text-foreground">{p?.characterName ?? `Char ${cid}`}</span>
+                  <span className="truncate">{sys ?? '—'}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        <p className="text-xs text-muted-foreground">
+          Hop {progressIndex + 1} of {activeRoute.hops.length}
+        </p>
+      </CardContent>
+    </Card>
   );
 }

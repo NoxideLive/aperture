@@ -179,6 +179,7 @@ import {
   toggleSystemMuteEvent,
   type ExperimentalSoundLayoutSettings,
 } from '@/lib/experimentalSoundLayout';
+import { remainingActiveRouteHops } from '@/lib/map/activeRouteMonitor';
 import type { SoundEvent } from '@/lib/sounds/prefs';
 import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
 import { ExperimentalUndoHotkeys } from './ExperimentalUndoHotkeys';
@@ -1165,14 +1166,20 @@ export function MapCanvas({
       toast.error('No character for waypoint push.');
       return;
     }
-    const push = await pushKspaceWaypointsForCharacter(charId, mapActiveRoute.hops);
+    const primaryPresence = viewData.presence.find((p) => p.characterId === charId);
+    const hops = remainingActiveRouteHops(
+      mapActiveRoute.hops,
+      mapActiveRoute.waypointCursor,
+      primaryPresence?.systemId ?? null,
+    );
+    const push = await pushKspaceWaypointsForCharacter(charId, hops);
     if (!push.ok) {
       toast.error(push.error);
       return;
     }
     toast.success(`Waypoints refreshed (${push.pushed})`);
     router.refresh();
-  }, [mainCharacterId, mapActiveRoute, router, viewerCharacterIds]);
+  }, [mainCharacterId, mapActiveRoute, router, viewData.presence, viewerCharacterIds]);
 
   // Hidden picker for importing someone else's exported layout file.
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -3117,7 +3124,9 @@ export function MapCanvas({
           <CurrentRoutePanel
             activeRoute={mapActiveRoute}
             viewData={viewData}
+            primaryCharacterId={mainCharacterId ?? viewerCharacterIds[0] ?? null}
             onSetRoute={experimentalActive ? () => void refreshActiveRouteWaypoints() : undefined}
+            onHopClick={experimentalActive ? focusMapSystemByEveId : undefined}
           />
         ) : null;
       case 'pilots':

@@ -9,6 +9,34 @@ export function isOnActiveRoute(hops: RouteHop[], systemId: number): boolean {
   return activeRouteHopSystemIds(hops).has(systemId);
 }
 
+/**
+ * First hop index for the remaining leg: at least `waypointCursor`, and at the
+ * primary pilot's current system when they are on the stored path.
+ */
+export function activeRouteProgressIndex(
+  hops: RouteHop[],
+  waypointCursor: number,
+  currentSystemId: number | null,
+): number {
+  if (hops.length === 0) return 0;
+  let idx = Math.min(Math.max(0, waypointCursor), hops.length - 1);
+  if (currentSystemId == null) return idx;
+  let onPath = -1;
+  for (let i = 0; i < hops.length; i++) {
+    if (hops[i]!.systemId === currentSystemId) onPath = i;
+  }
+  if (onPath >= idx) return onPath;
+  return idx;
+}
+
+export function remainingActiveRouteHops(
+  hops: RouteHop[],
+  waypointCursor: number,
+  currentSystemId: number | null,
+): RouteHop[] {
+  return hops.slice(activeRouteProgressIndex(hops, waypointCursor, currentSystemId));
+}
+
 /** `ap_map_connection.id` strings referenced by wormhole hops. */
 export function activeRouteConnectionIds(hops: RouteHop[]): string[] {
   const out: string[] = [];
