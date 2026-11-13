@@ -16,4 +16,4 @@ Sets `data-ui`, `data-theme`, and `data-variant` on `<html>` when active.
 Maps the UI mode to `MapStyleVariant` for the map canvas.
 
 ### Client hook
-`useExperimentalUi()` in `experimentalUi.client.tsx` mirrors cookie/`data-*` attributes in place.
+`useExperimentalUi(serverInitial?)` in `experimentalUi.client.ts` seeds from the SSR cookie when provided, then mirrors cookie/`data-*` attributes in place.

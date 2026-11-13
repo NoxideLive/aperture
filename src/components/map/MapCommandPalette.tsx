@@ -31,21 +31,27 @@ export function MapCommandPalette({
   open,
   onOpenChange,
   actions,
+  resolveQueryActions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actions: MapCommandAction[];
+  /** Dynamic actions for the current query (e.g. focus on-map systems); listed first when non-empty. */
+  resolveQueryActions?: (query: string) => MapCommandAction[];
 }) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim();
+    const q = raw.toLowerCase();
+    const focus = raw ? resolveQueryActions?.(raw) ?? [] : [];
     if (!q) return actions;
-    return actions.filter((a) => {
+    const base = actions.filter((a) => {
       const blob = `${a.label} ${a.hint ?? ''} ${a.keywords ?? ''}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [actions, query]);
+    return focus.length > 0 ? [...focus, ...base] : base;
+  }, [actions, query, resolveQueryActions]);
 
   const run = useCallback(
     (action: MapCommandAction) => {

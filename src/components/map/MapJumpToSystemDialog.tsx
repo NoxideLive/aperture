@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { MapSystemNode } from '@/lib/map/loadMap';
+import { focusSystemActionLabel, matchSystemsForFocus } from '@/lib/map/commandPaletteSystemFocus';
 
 /** Experimental: fuzzy-filter on-map systems and pan the canvas to the pick. */
 export function MapJumpToSystemDialog({
@@ -28,15 +29,13 @@ export function MapJumpToSystemDialog({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const sorted = [...systems].sort((a, b) => a.name.localeCompare(b.name));
-    if (!q) return sorted;
-    return sorted.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.alias?.toLowerCase().includes(q) ?? false) ||
-        (s.tag?.toLowerCase().includes(q) ?? false),
-    );
+    const raw = query.trim();
+    if (!raw) {
+      return [...systems].sort((a, b) =>
+        focusSystemActionLabel(a).localeCompare(focusSystemActionLabel(b)),
+      );
+    }
+    return matchSystemsForFocus(systems, raw).map((m) => m.system);
   }, [query, systems]);
 
   const handleOpenChange = useCallback(
@@ -101,7 +100,7 @@ export function MapJumpToSystemDialog({
                 }`}
                 onClick={() => pick(s.id)}
               >
-                <span>{s.alias ?? s.name}</span>
+                <span>{focusSystemActionLabel(s)}</span>
                 <span className="text-muted-foreground">{s.security}</span>
               </button>
             </li>

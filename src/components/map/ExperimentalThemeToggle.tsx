@@ -8,7 +8,6 @@ import {
   MenuItem,
   MenuTrigger,
 } from '@/components/ui/menu';
-import { useExperimentalUi } from '@/lib/experimentalUi.client';
 import type { ExperimentalUiMode } from '@/lib/experimentalUi';
 
 const CHOICES: { value: ExperimentalUiMode; label: string }[] = [
@@ -18,8 +17,13 @@ const CHOICES: { value: ExperimentalUiMode; label: string }[] = [
   { value: 'classic', label: 'Classic' },
 ];
 
-export function ExperimentalThemeToggle() {
-  const [mode, setMode] = useExperimentalUi();
+export function ExperimentalThemeToggle({
+  mode,
+  onModeChange,
+}: {
+  mode: ExperimentalUiMode;
+  onModeChange: (mode: ExperimentalUiMode) => void;
+}) {
   return (
     <Menu>
       <MenuTrigger
@@ -31,7 +35,7 @@ export function ExperimentalThemeToggle() {
       />
       <MenuContent>
         {CHOICES.map((c) => (
-          <MenuItem key={c.value} onClick={() => setMode(c.value)}>
+          <MenuItem key={c.value} onClick={() => onModeChange(c.value)}>
             {mode === c.value ? `✓ ${c.label}` : c.label}
           </MenuItem>
         ))}

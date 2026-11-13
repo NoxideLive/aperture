@@ -196,6 +196,10 @@ import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { applyExperimentalPanelCollapse } from '@/lib/map/layout/experimentalCollapse';
 import { MapCommandPalette, useMapCommandPaletteKeyboard } from './MapCommandPalette';
+import {
+  focusSystemActionLabel,
+  matchSystemsForFocus,
+} from '@/lib/map/commandPaletteSystemFocus';
 import { ExperimentalThemeToggle } from './ExperimentalThemeToggle';
 import { MapStyleProvider } from './MapStyleContext';
 import { MapLinkHoverProvider } from './MapLinkHoverContext';
@@ -696,7 +700,7 @@ export function MapCanvas({
   // a saved layout (a panel that shipped after the user last saved). All are
   // normalisers, no data migration. No-ops for `DEFAULT_MAP_LAYOUT` (already
   // current and complete).
-  const [experimentalUi, setExperimentalUi] = useExperimentalUi();
+  const [experimentalUi, setExperimentalUi] = useExperimentalUi(initialExperimentalUi);
   const experimentalActive = isExperimentalUiActive(experimentalUi);
   const mapStyleOpts = useMemo<MapStyleOptions>(() => {
     if (!experimentalActive) {
@@ -2887,6 +2891,20 @@ export function MapCanvas({
   }, [experimentalActive, selected]);
   /* eslint-enable react-hooks/refs */
 
+  const resolveCommandPaletteQueryActions = useCallback(
+    (query: string) => {
+      if (!experimentalActive) return [];
+      return matchSystemsForFocus(viewData.systems, query).slice(0, 12).map((m) => ({
+        id: `focus-system-${m.system.id}`,
+        label: `Focus ${focusSystemActionLabel(m.system)}`,
+        hint: m.system.tag ?? m.system.name,
+        keywords: `${m.system.name} ${m.system.alias ?? ''} ${m.system.tag ?? ''}`,
+        run: () => jumpToMapSystem(m.system.id),
+      }));
+    },
+    [experimentalActive, jumpToMapSystem, viewData.systems],
+  );
+
   useMapCommandPaletteKeyboard({
     enabled: experimentalActive,
     actions: commandActions,
@@ -3426,7 +3444,12 @@ export function MapCanvas({
                     <MapShareIndicator shares={liveShares} />
                   </div>
                   <div className="ap-map-toolbar flex shrink-0 items-center gap-1">
-                    {experimentalActive ? <ExperimentalThemeToggle /> : null}
+                    {experimentalActive ? (
+                      <ExperimentalThemeToggle
+                        mode={experimentalUi}
+                        onModeChange={setExperimentalUi}
+                      />
+                    ) : null}
                     {experimentalActive ? (
                       <Button
                         variant="ghost"
@@ -3573,6 +3596,7 @@ export function MapCanvas({
                   open={commandOpen}
                   onOpenChange={setCommandOpen}
                   actions={commandActions}
+                  resolveQueryActions={resolveCommandPaletteQueryActions}
                 />
               ) : null}
               {experimentalActive ? (

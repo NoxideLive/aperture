@@ -1,6 +1,6 @@
 ## MapJumpToSystemDialog
 
-**Purpose:** Experimental command-palette jump: filter visible map systems and center the canvas on the selection.
+**Purpose:** Experimental jump picker — rank on-map systems (`matchSystemsForFocus`: exact tag, then name/alias prefix) and center the canvas on the pick.
 **File:** `src/components/map/MapJumpToSystemDialog.tsx`
 
 ### Props

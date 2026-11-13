@@ -5,7 +5,7 @@
 
 ### `MapCommandPalette`
 
-**Props:** `open`, `onOpenChange`, `actions` (`MapCommandAction[]`).
+**Props:** `open`, `onOpenChange`, `actions` (`MapCommandAction[]`), optional `resolveQueryActions(query)` for query-driven rows (prepended when the filter is non-empty).
 
 **Renders:** A dialog with a filter field and a scrollable list of commands; Enter runs the first match.
 

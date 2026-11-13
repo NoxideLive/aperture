@@ -7,9 +7,16 @@ import {
   type ExperimentalUiMode,
 } from '@/lib/experimentalUi';
 
-/** Client hook: current mode from `<html>` plus a setter that updates cookie and attributes in place. */
-export function useExperimentalUi(): [ExperimentalUiMode, (mode: ExperimentalUiMode) => void] {
-  const [mode, setModeState] = useState<ExperimentalUiMode>(() => readExperimentalUiFromHtml());
+/**
+ * Client hook: current mode from SSR seed (`serverInitial`) or live `<html>`
+ * attributes, plus a setter that updates cookie and attributes in place.
+ */
+export function useExperimentalUi(
+  serverInitial?: ExperimentalUiMode,
+): [ExperimentalUiMode, (mode: ExperimentalUiMode) => void] {
+  const [mode, setModeState] = useState<ExperimentalUiMode>(
+    () => serverInitial ?? readExperimentalUiFromHtml(),
+  );
 
   const setMode = useCallback((next: ExperimentalUiMode) => {
     writeExperimentalUi(next);
