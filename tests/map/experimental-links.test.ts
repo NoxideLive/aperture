@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   connectionStyle,
+  experimentalEolCountdownPillClass,
   experimentalEolOutlineClass,
   experimentalEolOutlineClassFromUrgency,
 } from '@/components/map/styling';
@@ -36,6 +37,17 @@ describe('experimentalEolOutlineClass', () => {
     expect(experimentalEolOutlineClass('critical')).toContain('ap-connection-eol-stage-critical');
     expect(experimentalEolOutlineClass('expired')).toContain('ap-connection-eol-stage-critical');
     expect(experimentalEolOutlineClass('none')).toBeNull();
+  });
+});
+
+describe('experimentalEolCountdownPillClass', () => {
+  it('maps urgency to countdown pill classes only', () => {
+    expect(experimentalEolCountdownPillClass('warning')).toBe(
+      'ap-connection-eol-countdown-pill-warning',
+    );
+    expect(experimentalEolCountdownPillClass('critical')).toBe(
+      'ap-connection-eol-countdown-pill-critical',
+    );
   });
 });
 

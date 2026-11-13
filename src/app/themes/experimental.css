@@ -156,37 +156,58 @@
   pointer-events: none;
 }
 
-/* <4h remaining: orange border */
-[data-ui='experimental'] .ap-connection-eol-stage-eol {
+/* Live EOL countdown pill on the badge cluster (card ring stays neutral). */
+[data-ui='experimental'] .ap-connection-eol-countdown-pill-warning {
+  color: #f97316;
+  background-color: color-mix(in srgb, #f97316 20%, var(--card));
+}
+
+[data-ui='experimental'] .ap-connection-eol-countdown-pill-critical {
+  color: #ef4444;
+  background-color: color-mix(in srgb, #ef4444 20%, var(--card));
+}
+
+[data-ui='experimental'][data-theme='light'] .ap-connection-eol-countdown-pill-warning {
+  color: #ea580c;
+  background-color: color-mix(in srgb, #f97316 14%, #ffffff);
+}
+
+[data-ui='experimental'][data-theme='light'] .ap-connection-eol-countdown-pill-critical {
+  color: #dc2626;
+  background-color: color-mix(in srgb, #ef4444 12%, #ffffff);
+}
+
+/* <4h remaining: orange border (map edge outline path only) */
+[data-ui='experimental'] path.ap-connection-eol-outline.ap-connection-eol-stage-eol {
   stroke: #f97316;
   stroke-width: 3px;
   stroke-opacity: 0.9;
 }
 
-[data-ui='experimental'][data-theme='light'] .ap-connection-eol-stage-eol {
+[data-ui='experimental'][data-theme='light'] path.ap-connection-eol-outline.ap-connection-eol-stage-eol {
   stroke: #ea580c;
   stroke-opacity: 0.92;
 }
 
-[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-stage-eol {
+[data-ui='experimental'][data-variant='classic'] path.ap-connection-eol-outline.ap-connection-eol-stage-eol {
   stroke: #f59e0b;
   stroke-width: 3px;
   stroke-opacity: 0.9;
 }
 
-/* ≤1h remaining: red border */
-[data-ui='experimental'] .ap-connection-eol-stage-critical {
+/* ≤1h remaining: red border (map edge outline path only) */
+[data-ui='experimental'] path.ap-connection-eol-outline.ap-connection-eol-stage-critical {
   stroke: #ef4444;
   stroke-width: 3px;
   stroke-opacity: 0.9;
 }
 
-[data-ui='experimental'][data-theme='light'] .ap-connection-eol-stage-critical {
+[data-ui='experimental'][data-theme='light'] path.ap-connection-eol-outline.ap-connection-eol-stage-critical {
   stroke: #dc2626;
   stroke-opacity: 0.92;
 }
 
-[data-ui='experimental'][data-variant='classic'] .ap-connection-eol-stage-critical {
+[data-ui='experimental'][data-variant='classic'] path.ap-connection-eol-outline.ap-connection-eol-stage-critical {
   stroke: #dc2626;
   stroke-width: 3px;
 }

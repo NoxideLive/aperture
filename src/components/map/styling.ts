@@ -331,6 +331,15 @@ export const EOL_URGENCY_COLORS = {
   critical: { text: '#ef4444', border: '#ef4444' },
 } as const;
 
+/** Filled countdown pill on the connection tag — urgency colour stays on the pill only. */
+export function experimentalEolCountdownPillClass(
+  urgency: 'warning' | 'critical',
+): string {
+  return urgency === 'critical'
+    ? 'ap-connection-eol-countdown-pill-critical'
+    : 'ap-connection-eol-countdown-pill-warning';
+}
+
 function connectionImportanceStyle(
   edge: Pick<MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'>,
   opts?: MapStyleOptions,

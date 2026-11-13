@@ -9,7 +9,7 @@ import { Eye, RefreshCw, Shield, type LucideIcon } from 'lucide-react';
 import {
   connectionBadges,
   connectionStyle,
-  EOL_URGENCY_COLORS,
+  experimentalEolCountdownPillClass,
   experimentalEolOutlineClass,
   experimentalEolOutlineClassFromUrgency,
 } from './styling';
@@ -339,11 +339,7 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
                       ) : b.eolUrgency ? (
                         <span
                           key={b.key}
-                          className="rounded-sm border px-1 py-px font-medium"
-                          style={{
-                            color: EOL_URGENCY_COLORS[b.eolUrgency].text,
-                            borderColor: EOL_URGENCY_COLORS[b.eolUrgency].border,
-                          }}
+                          className={`rounded-sm px-1 py-px font-medium ${experimentalEolCountdownPillClass(b.eolUrgency)}`}
                         >
                           {b.label}
                         </span>

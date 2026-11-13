@@ -39,7 +39,10 @@ Fallback outline classes from the stored `eolStage` when countdown is unavailabl
 Maps live urgency (`warning` orange, `critical` red) to outline CSS classes on `ConnectionEdge`.
 
 ### EOL_URGENCY_COLORS
-Border and text colours for live EOL countdown tags.
+Text/border hex tokens for live EOL urgency (map edge outline helpers).
+
+### experimentalEolCountdownPillClass(urgency): string
+CSS class for the filled live countdown pill on a connection tag; the badge-cluster card keeps a neutral ring.
 
 ### connectionStyle(edge: Pick&lt;MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'&gt;): EdgeStyle
 Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `expired` sparsest (`1 4`, barely-there), `critical` (1h) tighter (`2 3`) than `eol` (4h, `6 4`) — to read as progressively more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
