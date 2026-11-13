@@ -168,6 +168,18 @@ import { pushKspaceWaypointsForCharacter } from '@/lib/character/pushRouteWaypoi
 import { ExperimentalCombatRingProvider } from './ExperimentalCombatRingContext';
 import { ExperimentalCombatKillBridge } from './ExperimentalCombatKillBridge';
 import { ExperimentalCombatSoundBridge } from './ExperimentalCombatSoundBridge';
+import { ExperimentalSoundGateProvider } from './ExperimentalSoundGate';
+import { ExperimentalFollowPilotBridge } from './ExperimentalFollowPilotBridge';
+import {
+  isSystemMutedForDisplay,
+  mergeSoundPanelSettings,
+  mutedSystemsForMap,
+  parseExperimentalSoundLayoutSettings,
+  setSystemMuteAll,
+  toggleSystemMuteEvent,
+  type ExperimentalSoundLayoutSettings,
+} from '@/lib/experimentalSoundLayout';
+import type { SoundEvent } from '@/lib/sounds/prefs';
 import { MapJumpToSystemDialog } from './MapJumpToSystemDialog';
 import { ExperimentalUndoHotkeys } from './ExperimentalUndoHotkeys';
 import { CurrentRoutePanel } from '@/components/sidebar/CurrentRoutePanel';
@@ -837,6 +849,22 @@ export function MapCanvas({
     [saveLayout],
   );
 
+  const soundLayoutSettings = useMemo(
+    () => parseExperimentalSoundLayoutSettings(layout),
+    [layout],
+  );
+
+  const persistSoundLayoutSettings = useCallback(
+    (next: ExperimentalSoundLayoutSettings) => {
+      setLayout((prev) => {
+        const updated = mergeSoundPanelSettings(prev, next);
+        saveLayout(updated);
+        return updated;
+      });
+    },
+    [saveLayout],
+  );
+
   const applyLayoutPreset = useCallback(
     (preset: ExperimentalLayoutPreset) => {
       const next = ensurePanelsPlaced(dedupeGroups(migrateLayout(experimentalLayoutPreset(preset))));
@@ -1350,6 +1378,39 @@ export function MapCanvas({
 
   // ---- xyflow → server callbacks -----------------------------------------
   const mapId = viewData.map.id;
+
+  const mapMutedSystems = useMemo(
+    () => mutedSystemsForMap(soundLayoutSettings, mapId),
+    [soundLayoutSettings, mapId],
+  );
+
+  const experimentalContextMenuSound = useMemo(() => {
+    if (!experimentalActive || contextMenu?.kind !== 'system') return undefined;
+    const mapSystemId = contextMenu.id;
+    const entry = mapMutedSystems?.[mapSystemId];
+    return {
+      isMuted: isSystemMutedForDisplay(mapMutedSystems, mapSystemId),
+      isEventMuted: (event: SoundEvent) =>
+        entry?.all === true || entry?.events?.[event] === true,
+      onMuteAll: (mute: boolean) => {
+        persistSoundLayoutSettings(
+          setSystemMuteAll(soundLayoutSettings, mapId, mapSystemId, mute),
+        );
+      },
+      onToggleEventMute: (event: SoundEvent, muted: boolean) => {
+        persistSoundLayoutSettings(
+          toggleSystemMuteEvent(soundLayoutSettings, mapId, mapSystemId, event, muted),
+        );
+      },
+    };
+  }, [
+    experimentalActive,
+    contextMenu,
+    mapMutedSystems,
+    mapId,
+    persistSoundLayoutSettings,
+    soundLayoutSettings,
+  ]);
 
   // Only the tab holding this map's lock plays its cues; standing down on
   // unmount hands the lock to the next waiter.
@@ -2355,6 +2416,7 @@ export function MapCanvas({
     signatureHoverFarSystemId: string | null;
     routeHighlightMapSystemIds: ReadonlySet<string>;
     routeFocusMapSystemId: string | null;
+    mapMutedSystems: ReturnType<typeof mutedSystemsForMap>;
   } | null>(null);
   if (
     !lastSync ||
@@ -2366,6 +2428,7 @@ export function MapCanvas({
     lastSync.signatureHoverFarSystemId !== signatureHoverFarSystemId ||
     lastSync.routeHighlightMapSystemIds !== routeHighlightMapSystemIds ||
     lastSync.routeFocusMapSystemId !== routeFocusMapSystemId ||
+    lastSync.mapMutedSystems !== mapMutedSystems ||
     // `intel` is replaced by reference when a live-added system's data backfills;
     // re-sync so its decorators (sov/FW/incursion) appear without a systems change.
     lastSync.intel !== intel
@@ -2380,6 +2443,7 @@ export function MapCanvas({
       signatureHoverFarSystemId,
       routeHighlightMapSystemIds,
       routeFocusMapSystemId,
+      mapMutedSystems,
     });
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
@@ -2407,6 +2471,8 @@ export function MapCanvas({
               routePathLinked:
                 experimentalActive &&
                 (routeHighlightMapSystemIds.has(s.id) || routeFocusMapSystemId === s.id),
+              soundMuted:
+                experimentalActive && isSystemMutedForDisplay(mapMutedSystems, s.id),
             },
             selected: selectedSystemIds.has(s.id),
             draggable: !s.locked,
@@ -2922,6 +2988,7 @@ export function MapCanvas({
               onAddNoteAt={onAddNoteAt}
               onNotePatch={onNotePatch}
               onNoteRemove={onNoteRemove}
+              experimentalSound={experimentalContextMenuSound}
             />
           </div>
         );
@@ -2972,6 +3039,7 @@ export function MapCanvas({
             onFiltersChange={setSigSearchFilters}
             onNavigate={handleNavigateToSig}
             tagScheme={viewData.map.tagScheme}
+            onRowHover={experimentalActive ? setSignatureHoverFarSystemId : undefined}
           />
         );
       case 'inspector':
@@ -3081,6 +3149,7 @@ export function MapCanvas({
       switch (id) {
         case 'canvas':
           return (
+            <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -3093,6 +3162,21 @@ export function MapCanvas({
               />
               Keep map selection on paste
             </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={soundLayoutSettings.followSelectedPilot === true}
+                onChange={(e) => {
+                  persistSoundLayoutSettings({
+                    ...soundLayoutSettings,
+                    followSelectedPilot: e.target.checked,
+                  });
+                }}
+              />
+              Follow selected pilot
+            </label>
+            </div>
           );
         case 'signatures':
           return (
@@ -3136,7 +3220,14 @@ export function MapCanvas({
           return null;
       }
     },
-    [experimentalActive, lazyDeleteSigs, panelGearJumpBridge, panelGearKeepSelection],
+    [
+      experimentalActive,
+      lazyDeleteSigs,
+      panelGearJumpBridge,
+      panelGearKeepSelection,
+      persistSoundLayoutSettings,
+      soundLayoutSettings,
+    ],
   );
 
   const panelHeaderRight = (id: PanelId): ReactNode => {
@@ -3177,27 +3268,66 @@ export function MapCanvas({
                 <TravelBridge systems={viewData.systems} connections={viewData.connections} />
               )}
               <MapUnderglowBridge systems={viewData.systems} mapId={data.map.id} />
-              {(pilotArrivedOn || pilotLeftOn) && (
-                <PresenceSoundBridge
+              {experimentalActive ? (
+                <ExperimentalSoundGateProvider
                   mapId={mapId}
+                  settings={soundLayoutSettings}
                   systems={viewData.systems}
-                  connections={viewData.connections}
-                  viewerCharacterIds={viewerCharacterIds}
-                  watchedJumpOn={watchedJumpOn}
-                />
+                >
+                  {(pilotArrivedOn || pilotLeftOn) && (
+                    <PresenceSoundBridge
+                      mapId={mapId}
+                      systems={viewData.systems}
+                      connections={viewData.connections}
+                      viewerCharacterIds={viewerCharacterIds}
+                      watchedJumpOn={watchedJumpOn}
+                    />
+                  )}
+                  {watchedJumpOn && (
+                    <WatchedConnectionSoundBridge
+                      mapId={mapId}
+                      systems={viewData.systems}
+                      connections={viewData.connections}
+                      viewerCharacterIds={viewerCharacterIds}
+                    />
+                  )}
+                  {(killInSystemOn || systemPingedOn) && (
+                    <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
+                  )}
+                  {rallySetOn && <RallySoundBridge mapId={mapId} />}
+                </ExperimentalSoundGateProvider>
+              ) : (
+                <>
+                  {(pilotArrivedOn || pilotLeftOn) && (
+                    <PresenceSoundBridge
+                      mapId={mapId}
+                      systems={viewData.systems}
+                      connections={viewData.connections}
+                      viewerCharacterIds={viewerCharacterIds}
+                      watchedJumpOn={watchedJumpOn}
+                    />
+                  )}
+                  {watchedJumpOn && (
+                    <WatchedConnectionSoundBridge
+                      mapId={mapId}
+                      systems={viewData.systems}
+                      connections={viewData.connections}
+                      viewerCharacterIds={viewerCharacterIds}
+                    />
+                  )}
+                  {(killInSystemOn || systemPingedOn) && (
+                    <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
+                  )}
+                  {rallySetOn && <RallySoundBridge mapId={mapId} />}
+                </>
               )}
-              {watchedJumpOn && (
-                <WatchedConnectionSoundBridge
-                  mapId={mapId}
+              {experimentalActive ? (
+                <ExperimentalFollowPilotBridge
+                  enabled={soundLayoutSettings.followSelectedPilot === true}
+                  focusEveSystemId={focusMapSystemByEveId}
                   systems={viewData.systems}
-                  connections={viewData.connections}
-                  viewerCharacterIds={viewerCharacterIds}
                 />
-              )}
-              {(killInSystemOn || systemPingedOn) && (
-                <SystemNotificationSoundBridge mapId={mapId} systems={viewData.systems} />
-              )}
-              {rallySetOn && <RallySoundBridge mapId={mapId} />}
+              ) : null}
               {experimentalActive ? <ExperimentalRallyNotify mapId={mapId} /> : null}
               {experimentalActive ? (
                 <ExperimentalActiveRouteBridge
