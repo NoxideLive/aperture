@@ -32,4 +32,21 @@ describe('experimentalQolPrefs', () => {
     const { readKeepMapSelection } = await import('@/lib/experimentalQolPrefs');
     expect(readKeepMapSelection()).toBe(false);
   });
+
+  it('re-applies pointer cursor on html after off then on', async () => {
+    const { writeExperimentalPointerCursor, applyPointerCursorAttribute } = await import(
+      '@/lib/experimentalQolPrefs'
+    );
+    writeExperimentalPointerCursor(false);
+    expect(document.documentElement.getAttribute('data-pointer-cursor')).toBe('off');
+    applyPointerCursorAttribute(true);
+    expect(document.documentElement.getAttribute('data-pointer-cursor')).toBe('on');
+    const item = document.createElement('div');
+    item.setAttribute('data-slot', 'menu-item');
+    item.style.cursor = 'default';
+    document.body.appendChild(item);
+    writeExperimentalPointerCursor(true);
+    expect(item.style.cursor).toBe('');
+    item.remove();
+  });
 });

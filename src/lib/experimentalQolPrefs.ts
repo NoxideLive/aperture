@@ -55,12 +55,24 @@ export function writeExperimentalPointerCursor(on: boolean): void {
   window.dispatchEvent(new CustomEvent('aperture:experimental-qol-prefs'));
 }
 
+const PORTAL_MENU_CURSOR_SELECTOR =
+  '[data-slot="menu-item"],[data-slot="menu-submenu-trigger"],[data-slot="menu-checkbox-item"],[data-slot="menu-radio-item"],[data-slot="select-item"],[role="menuitem"]';
+
+/** Drop inline cursor on open portalled menus so the html attribute rule applies again after toggling. */
+function clearPortalledMenuInlineCursor(): void {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll<HTMLElement>(PORTAL_MENU_CURSOR_SELECTOR).forEach((el) => {
+    el.style.removeProperty('cursor');
+  });
+}
+
 export function applyPointerCursorAttribute(on: boolean): void {
   if (!isExperimentalUiActive(readExperimentalUiFromHtml())) {
     document.documentElement.removeAttribute('data-pointer-cursor');
     return;
   }
   document.documentElement.setAttribute('data-pointer-cursor', on ? 'on' : 'off');
+  if (on) clearPortalledMenuInlineCursor();
 }
 
 export function readPastePreviewOnCtrlV(): boolean {
