@@ -12,12 +12,15 @@ export function CurrentRoutePanel({
   viewData,
   primaryCharacterId,
   onSetRoute,
+  onStopRoute,
   onHopClick,
 }: {
   activeRoute: MapActiveRouteView | null;
   viewData: MapViewData;
   primaryCharacterId: number | null;
   onSetRoute?: () => void;
+  /** Clears the owner's `ap_map_active_route` row (followers included). */
+  onStopRoute?: () => void;
   onHopClick?: (eveSystemId: number) => void;
 }) {
   const presenceByChar = useMemo(() => {
@@ -79,15 +82,26 @@ export function CurrentRoutePanel({
                 {activeRoute.followerCharacterIds.length === 1 ? '' : 's'}
               </span>
             </span>
-            {onSetRoute ? (
-              <button
-                type="button"
-                onClick={onSetRoute}
-                className="shrink-0 text-[10px] text-primary hover:underline"
-              >
-                Set route / refresh waypoints
-              </button>
-            ) : null}
+            <span className="flex shrink-0 items-center gap-2">
+              {onSetRoute ? (
+                <button
+                  type="button"
+                  onClick={onSetRoute}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Refresh waypoints
+                </button>
+              ) : null}
+              {onStopRoute ? (
+                <button
+                  type="button"
+                  onClick={onStopRoute}
+                  className="text-[10px] text-muted-foreground hover:text-destructive"
+                >
+                  Stop
+                </button>
+              ) : null}
+            </span>
           </div>
           <RouteHopBreadcrumb hops={remainingHops} onHopClick={onHopClick} />
         </div>

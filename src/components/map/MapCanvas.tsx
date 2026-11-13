@@ -217,6 +217,7 @@ import {
 import { parsePanelSplitDroppableId, splitPanelAdjacent } from '@/lib/map/layout/panelSplit';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
+import { clearMapActiveRouteAction } from '@/app/(app)/actions/mapActiveRoute';
 import { experimentalMapStyleVariant, isExperimentalUiActive } from '@/lib/experimentalUi';
 import { experimentalLayoutPreset } from '@/lib/experimentalLayoutPresets';
 import {
@@ -1385,6 +1386,16 @@ export function MapCanvas({
 
   // ---- xyflow → server callbacks -----------------------------------------
   const mapId = viewData.map.id;
+
+  const stopActiveRoute = useCallback(async () => {
+    const result = await clearMapActiveRouteAction({ mapId });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success('Active route stopped.');
+    router.refresh();
+  }, [mapId, router]);
 
   const mapMutedSystems = useMemo(
     () => mutedSystemsForMap(soundLayoutSettings, mapId),
@@ -3126,6 +3137,7 @@ export function MapCanvas({
             viewData={viewData}
             primaryCharacterId={mainCharacterId ?? viewerCharacterIds[0] ?? null}
             onSetRoute={experimentalActive ? () => void refreshActiveRouteWaypoints() : undefined}
+            onStopRoute={experimentalActive ? () => void stopActiveRoute() : undefined}
             onHopClick={experimentalActive ? focusMapSystemByEveId : undefined}
           />
         ) : null;
