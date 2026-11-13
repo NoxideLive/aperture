@@ -1,7 +1,7 @@
 import type { Layout } from 'react-grid-layout';
 
 /** Grid rows for an experimental collapsed panel (header chrome only). */
-export const EXPERIMENTAL_COLLAPSED_PANEL_H = 2;
+export const EXPERIMENTAL_COLLAPSED_PANEL_H = 1;
 
 /**
  * Adjusts the active breakpoint layout when an experimental panel group collapses

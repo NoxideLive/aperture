@@ -325,7 +325,7 @@ describe('applyExperimentalPanelCollapse', () => {
     const collapsed: Layout = [
       { i: 'canvas', x: 0, y: 0, w: 8, h: 12 },
       { i: 'signatures', x: 0, y: 12, w: 8, h: EXPERIMENTAL_COLLAPSED_PANEL_H },
-      { i: 'intel', x: 0, y: 14, w: 8, h: 4 },
+      { i: 'intel', x: 0, y: 13, w: 8, h: 4 },
     ];
     const next = applyExperimentalPanelCollapse(collapsed, 'signatures', false, saved)!;
     const sig = next.find((it) => it.i === 'signatures')!;
