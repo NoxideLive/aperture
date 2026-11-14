@@ -54,6 +54,9 @@ Removes `panel` from the group model in every breakpoint (the hide pathway). The
 
 **Returns:** The updated config. Returns the input **unchanged by reference** when `panel` is in no group.
 
+### mergePanelIntoGroup(config, bp, sourcePanel, targetGroupId): MapLayoutConfig
+Moves a tabbed member from its source group into another group on one breakpoint (dnd-kit header/tab merge). Dropped empty sources, anchor re-keying, and layout item renaming follow the same rules as hide. Returns the input unchanged on a no-op.
+
 ### dedupeGroups(config: MapLayoutConfig): MapLayoutConfig
 Repair normaliser run in the seed/import pipeline (after `migrateLayout`, before `ensurePanelsPlaced`). Enforces that a panel is a member of at most one group per breakpoint: the first occurrence in `groups[bp]` order wins, later duplicate memberships are stripped. A group emptied by de-duplication is dropped along with its grid item; a group whose anchor id was a stripped duplicate is re-keyed to a surviving member. Heals layouts saved while a stale `ensurePanelsPlaced` resurrected a tabbed member as a second standalone cell (the trailing duplicate loses).
 

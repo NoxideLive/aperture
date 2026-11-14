@@ -30,7 +30,7 @@ All features below require the experimental UI (`ap_ui` cookie). Legacy UI is un
 - Per-panel **+ Add** headers and palette entries (`docs/aperture-panel-actions.md`).
 - **⚙** popovers on Map, Signatures, Routes, Pilots (panel settings stub → `layout.panelSettings`).
 - Signature **clean up** dialog; layout presets Scanning/Combat/Travel; **copy/export/import** layout JSON.
-- DnD: merge pulse, tear-off ghost, **L/R/T/B split** drop zones on panel cards, larger tab drag ghost.
+- DnD: merge pulse, tear-off ghost, larger tab drag ghost.
 - Undo: per-panel stacks, **Ctrl+Z / Ctrl+Shift+Z**; map + signature mutations; **localStorage v2** serialized inverses (50 steps).
 
 ## Signatures (experimental)

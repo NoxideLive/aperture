@@ -10,6 +10,7 @@ import {
   PANELS,
   dedupeGroups,
   ensurePanelsPlaced,
+  mergePanelIntoGroup,
   migrateLayout,
   removePanelFromLayout,
 } from '@/lib/map/layout/panels';
@@ -187,6 +188,18 @@ describe('dedupeGroups', () => {
   it('is referentially stable when no panel is duplicated', () => {
     const clean = migrateLayout(DEFAULT_MAP_LAYOUT);
     expect(dedupeGroups(clean)).toBe(clean);
+  });
+});
+
+describe('mergePanelIntoGroup', () => {
+  it('moves a singleton tab into another group and activates it', () => {
+    const base = migrateLayout(DEFAULT_MAP_LAYOUT);
+    const next = mergePanelIntoGroup(base, 'lg', 'route', 'inspector');
+    const inspector = next.groups.lg.find((g) => g.id === 'inspector')!;
+    expect(inspector.members).toContain('route');
+    expect(inspector.active).toBe('route');
+    expect(next.groups.lg.some((g) => g.id === 'route')).toBe(false);
+    expect(next.layouts.lg.some((i) => i.i === 'route')).toBe(false);
   });
 });
 

@@ -215,10 +215,10 @@ import {
   PANEL_MIN,
   dedupeGroups,
   ensurePanelsPlaced,
+  mergePanelIntoGroup,
   migrateLayout,
   removePanelFromLayout,
 } from '@/lib/map/layout/panels';
-import { parsePanelSplitDroppableId, splitPanelAdjacent } from '@/lib/map/layout/panelSplit';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { clearMapActiveRouteAction } from '@/app/(app)/actions/mapActiveRoute';
@@ -988,53 +988,11 @@ export function MapCanvas({
   // per-breakpoint). If the source group empties it is dropped, along with its
   // grid item in `layouts[bp]` — `mergeLayouts` keeps only `prev` items, so a
   // removed item is not resurrected by RGL's next `onLayoutChange`.
-  const mergePanelIntoGroup = useCallback(
+  const handleMergePanelIntoGroup = useCallback(
     (sourcePanel: PanelId, targetGroupId: string) => {
       setLayout((prev) => {
-        const bp = breakpoint;
-        const source = prev.groups[bp].find((g) => g.members.includes(sourcePanel));
-        const target = prev.groups[bp].find((g) => g.id === targetGroupId);
-        if (!source || !target || source.id === targetGroupId) return prev;
-        const droppedIds = new Set<string>();
-        // Old group id → new anchor id, when removing the source's anchor member
-        // forces a re-key; its `layouts[bp]` item is renamed to match.
-        const renamed = new Map<string, PanelId>();
-        const groupsBp = prev.groups[bp].flatMap((g) => {
-          if (g.id === source.id) {
-            const members = g.members.filter((m) => m !== sourcePanel);
-            if (members.length === 0) {
-              droppedIds.add(g.id);
-              return [];
-            }
-            const active = g.active === sourcePanel ? members[0]! : g.active;
-            // A group's id must stay one of its members. If the removed panel was
-            // the anchor id, re-key to the new active so the freed PanelId isn't
-            // later reused for a second cell with a colliding id (duplicate keys).
-            if (g.id === sourcePanel) {
-              renamed.set(g.id, active);
-              return [{ id: active, members, active }];
-            }
-            return [{ ...g, members, active }];
-          }
-          if (g.id === targetGroupId) {
-            return [{ ...g, members: [...g.members, sourcePanel], active: sourcePanel }];
-          }
-          return [g];
-        });
-        const groups = { ...prev.groups, [bp]: groupsBp };
-        const layouts =
-          droppedIds.size > 0 || renamed.size > 0
-            ? {
-                ...prev.layouts,
-                [bp]: prev.layouts[bp]
-                  .filter((i) => !droppedIds.has(i.i))
-                  .map((it) => {
-                    const newId = renamed.get(it.i);
-                    return newId ? { ...it, i: newId, ...PANEL_MIN[newId] } : it;
-                  }),
-              }
-            : prev.layouts;
-        const next: MapLayoutConfig = { ...prev, groups, layouts };
+        const next = mergePanelIntoGroup(prev, breakpoint, sourcePanel, targetGroupId);
+        if (next === prev) return prev;
         saveLayout(next);
         return next;
       });
@@ -1132,18 +1090,8 @@ export function MapCanvas({
   const handlePanelDrop = useCallback(
     (activePanel: PanelId, overId: string) => {
       const groupsBp = layout.groups[breakpoint] ?? [];
-      const split = parsePanelSplitDroppableId(overId);
-      if (split) {
-        setLayout((prev) => {
-          const next = splitPanelAdjacent(prev, breakpoint, activePanel, split.groupId, split.side);
-          if (next === prev) return prev;
-          saveLayout(next);
-          return next;
-        });
-        return;
-      }
       if (overId.startsWith('grp:')) {
-        mergePanelIntoGroup(activePanel, overId.slice(4));
+        handleMergePanelIntoGroup(activePanel, overId.slice(4));
         return;
       }
       const overPanel = overId as PanelId;
@@ -1153,10 +1101,10 @@ export function MapCanvas({
       if (overGroup.id === sourceGroup.id) {
         reorderTab(sourceGroup.id, activePanel, overPanel);
       } else {
-        mergePanelIntoGroup(activePanel, overGroup.id);
+        handleMergePanelIntoGroup(activePanel, overGroup.id);
       }
     },
-    [layout.groups, breakpoint, mergePanelIntoGroup, reorderTab],
+    [layout.groups, breakpoint, handleMergePanelIntoGroup, reorderTab],
   );
 
   // Reset to the shipped arrangement. Clone so later immutable updates can never

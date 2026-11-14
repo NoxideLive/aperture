@@ -318,6 +318,58 @@ export function removePanelFromLayout(config: MapLayoutConfig, panel: PanelId): 
  * member as a second standalone cell). Returns the input unchanged when every
  * panel already appears once.
  */
+/**
+ * Move `sourcePanel` from its current group into `targetGroupId` as an active tab
+ * on one breakpoint. Empty source groups and their grid items are dropped; anchor
+ * re-keying matches `removePanelFromLayout`. Returns the input unchanged when
+ * source or target is missing, or when source already belongs to the target group.
+ */
+export function mergePanelIntoGroup(
+  config: MapLayoutConfig,
+  bp: Breakpoint,
+  sourcePanel: PanelId,
+  targetGroupId: string,
+): MapLayoutConfig {
+  const source = config.groups[bp]?.find((g) => g.members.includes(sourcePanel));
+  const target = config.groups[bp]?.find((g) => g.id === targetGroupId);
+  if (!source || !target || source.id === targetGroupId) return config;
+  const droppedIds = new Set<string>();
+  const renamed = new Map<string, PanelId>();
+  const groupsBp = config.groups[bp].flatMap((g) => {
+    if (g.id === source.id) {
+      const members = g.members.filter((m) => m !== sourcePanel);
+      if (members.length === 0) {
+        droppedIds.add(g.id);
+        return [];
+      }
+      const active = g.active === sourcePanel ? members[0]! : g.active;
+      if (g.id === sourcePanel) {
+        renamed.set(g.id, active);
+        return [{ id: active, members, active }];
+      }
+      return [{ ...g, members, active }];
+    }
+    if (g.id === targetGroupId) {
+      return [{ ...g, members: [...g.members, sourcePanel], active: sourcePanel }];
+    }
+    return [g];
+  });
+  const groups = { ...config.groups, [bp]: groupsBp };
+  const layouts =
+    droppedIds.size > 0 || renamed.size > 0
+      ? {
+          ...config.layouts,
+          [bp]: config.layouts[bp]
+            .filter((i) => !droppedIds.has(i.i))
+            .map((it) => {
+              const newId = renamed.get(it.i);
+              return newId ? { ...it, i: newId, ...PANEL_MIN[newId] } : it;
+            }),
+        }
+      : config.layouts;
+  return { ...config, groups, layouts };
+}
+
 export function dedupeGroups(config: MapLayoutConfig): MapLayoutConfig {
   let changed = false;
   const layouts = { ...config.layouts };

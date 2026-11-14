@@ -1,6 +1,6 @@
 'use client';
 
-import { useDndMonitor, useDroppable } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -16,7 +16,6 @@ import { isExperimentalUiActive, readExperimentalUiFromHtml } from '@/lib/experi
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PANELS } from '@/lib/map/layout/panels';
-import { panelSplitDroppableId, type PanelSplitSide } from '@/lib/map/layout/panelSplit';
 import { cn } from '@/lib/utils';
 import type { PanelGroup, PanelId } from '@/types';
 import { ExperimentalPanelGear } from '@/components/map/experimentalPanelGear';
@@ -141,34 +140,14 @@ export function MapPanelGroup({
       onExperimentalCollapseChange?.(group.id, true);
     }
   }, [collapsed, experimental, group.id, onExperimentalCollapseChange]);
-  const [splitDragActive, setSplitDragActive] = useState(false);
-  useDndMonitor({
-    onDragStart: () => setSplitDragActive(true),
-    onDragEnd: () => setSplitDragActive(false),
-    onDragCancel: () => setSplitDragActive(false),
-  });
   if (visibleMembers.length === 0) return null;
   const activeMember = visibleMembers.includes(group.active) ? group.active : visibleMembers[0]!;
   const isSingle = visibleMembers.length === 1;
   // Highlight the header as a merge target only when a foreign tab hovers it.
   const isMergeTarget = isOver && active != null && !visibleMembers.includes(active.id as PanelId);
-  const showSplitZones =
-    experimental &&
-    splitDragActive &&
-    active != null &&
-    !visibleMembers.includes(active.id as PanelId);
 
   return (
-    <Card
-      className={cn(
-        experimental && collapsed ? 'h-auto' : 'h-full',
-        'relative gap-0 py-0',
-        showSplitZones && 'z-30',
-      )}
-    >
-      {showSplitZones ? (
-        <PanelSplitOverlays groupId={group.id} activeTitle={PANEL_TITLES[active!.id as PanelId]} />
-      ) : null}
+    <Card className={cn(experimental && collapsed ? 'h-auto' : 'h-full', 'relative gap-0 py-0')}>
       <div
         ref={setDroppableRef}
         className={cn(
@@ -246,66 +225,5 @@ export function MapPanelGroup({
         </div>
       ) : null}
     </Card>
-  );
-}
-
-const SPLIT_LABELS: Record<PanelSplitSide, string> = {
-  l: 'Left',
-  r: 'Right',
-  t: 'Top',
-  b: 'Bottom',
-};
-
-function PanelSplitOverlays({
-  groupId,
-  activeTitle,
-}: {
-  groupId: string;
-  activeTitle: string;
-}) {
-  const sides: PanelSplitSide[] = ['l', 'r', 't', 'b'];
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-primary/10 ring-2 ring-inset ring-primary/40"
-      aria-hidden
-    >
-      {sides.map((side) => (
-        <PanelSplitZone key={side} groupId={groupId} side={side} activeTitle={activeTitle} />
-      ))}
-    </div>
-  );
-}
-
-function PanelSplitZone({
-  groupId,
-  side,
-  activeTitle,
-}: {
-  groupId: string;
-  side: PanelSplitSide;
-  activeTitle: string;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: panelSplitDroppableId(groupId, side) });
-  const pos =
-    side === 'l'
-      ? 'left-0 top-1/4 h-1/2 w-1/4'
-      : side === 'r'
-        ? 'right-0 top-1/4 h-1/2 w-1/4'
-        : side === 't'
-          ? 'left-1/4 top-0 h-1/4 w-1/2'
-          : 'bottom-0 left-1/4 h-1/4 w-1/2';
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        'ap-panel-split-zone pointer-events-auto absolute flex items-center justify-center border border-dashed border-primary/70 bg-primary/20 text-[10px] font-medium text-primary',
-        pos,
-        isOver && 'bg-primary/35 ring-2 ring-primary',
-      )}
-    >
-      <span className="rounded bg-background/90 px-1 py-0.5 shadow-sm">
-        {SPLIT_LABELS[side]} · {activeTitle}
-      </span>
-    </div>
   );
 }
