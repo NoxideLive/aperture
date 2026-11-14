@@ -10,6 +10,7 @@ import {
 import { useRealtimeEvents } from '@/lib/realtime/useRealtime';
 import { getSoundEngine } from '@/lib/sounds/engine';
 import type { SoundEvent } from '@/types';
+import { shouldPlaySystemSound, useExperimentalSoundGate } from './ExperimentalSoundGate';
 
 const CUE_FOR_KIND: Record<SystemNotificationLoad['kind'], SoundEvent> = {
   killmail: 'killInSystem',
@@ -29,6 +30,7 @@ export function SystemNotificationSoundBridge({
   mapId: string;
   systems: MapSystemNode[];
 }) {
+  const soundGate = useExperimentalSoundGate();
   const systemsRef = useRef(systems);
   useEffect(() => {
     systemsRef.current = systems;
@@ -46,9 +48,12 @@ export function SystemNotificationSoundBridge({
         // The server's system-to-map index can trail a removal, so a system
         // this map no longer shows stays silent, as its underglow does.
         const { systemId } = parsed.data;
-        if (!systemsRef.current.some((s) => s.systemId === systemId)) return;
+        const row = systemsRef.current.find((s) => s.systemId === systemId);
+        if (!row) return;
+        const event = CUE_FOR_KIND[parsed.data.kind];
+        if (!shouldPlaySystemSound(soundGate, row.id, event)) return;
 
-        getSoundEngine().play(CUE_FOR_KIND[parsed.data.kind]);
+        getSoundEngine().play(event);
       },
       [mapId],
     ),

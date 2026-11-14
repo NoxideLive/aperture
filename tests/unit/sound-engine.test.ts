@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BUILT_IN_SOUNDS,
@@ -690,6 +688,10 @@ describe('voice packs', () => {
   });
 
   it('catalogues every voice id and ships the file it names', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { existsSync } = require('fs') as typeof import('node:fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require('path') as typeof import('node:path');
     for (const id of VOICE_SOUND_IDS) {
       const entry = getBuiltInSound(id);
       expect(entry?.kind).toBe('voice');

@@ -17,7 +17,7 @@
 | soundPrefs | SoundPrefs | yes | The account's saved sound preferences (master switch, volume, per-event enable + sound id); pushed into the engine whenever its content changes |
 
 ### Renders
-A roster list — each row shows portrait, name, role label (Member / Manager / Admin), and either a "Main" marker (current main), the kicked/banned status, or a "Set as main" button. Below it, a "Show connection travel animation" checkbox row, a "Signature indicators" section (two toggles + a "Mark stale after" hours input), a "Sounds" section (master checkbox, volume slider, one row per `SoundEvent` with an enable checkbox and a `SoundPicker`, then a "Your sounds" block with an "Add file" button and one row per imported sound carrying a preview and a remove button), then a destructive-bordered "Delete account" section embedding `DeleteAccountDialog`. Everything below the header sits in a scrolling body within a capped dialog height, so the title and close button stay pinned.
+A roster list — each row shows portrait, name, role label (Member / Manager / Admin), and either a "Main" marker (current main), the kicked/banned status, or a "Set as main" button. Below it, an **Experimental UI** fieldset (Off / Dark / Light radio group, device cookie via `useExperimentalUi`), a "Show connection travel animation" checkbox row, a "Signature indicators" section (two toggles + a "Mark stale after" hours input), a "Sounds" section (master checkbox, volume slider, one row per `SoundEvent` with an enable checkbox and a `SoundPicker`, then a "Your sounds" block with an "Add file" button and one row per imported sound carrying a preview and a remove button), then a destructive-bordered "Delete account" section embedding `DeleteAccountDialog`. Everything below the header sits in a scrolling body within a capped dialog height, so the title and close button stay pinned.
 
 ### Behaviour & Interactions
 - `mainId` is local optimistic state seeded from `mainCharacterId`; clicking "Set as main" calls `setMainCharacterAction` in a transition and moves the marker on success, toasting on failure.
@@ -27,6 +27,7 @@ A roster list — each row shows portrait, name, role label (Member / Manager / 
 - The `soundPrefs` prop is pushed into the engine on mount and again whenever its content differs from the last copy pushed, so a save made on another device lands on the next server render. A re-render carrying the same saved content leaves an in-flight optimistic edit alone.
 - A successful sound save is announced to the device's other tabs (`announceSoundPrefs`); a tab that receives one pushes the blob into its engine and takes its volume as committed, so its map's cue surfaces follow without a reload.
 - "Your sounds" is device state, not account state, rendered by an inner section that exists only while the dialog is open, so the IndexedDB store is read when someone opens the settings rather than on every page load. It reads `useCustomSounds()` and writes through `getCustomSoundStore()`, outside the `SoundPrefs` blob and outside the `pending` transition. The "Add file" button opens a hidden `audio/*` file input, which is cleared after every pick so re-choosing the same file fires again; a rejected import toasts the store's reason and an accepted one previews itself straight away. Removing a sound an event still names leaves the pref alone — the engine falls back to that event's default chime.
+- Experimental UI uses `useExperimentalUi()` (`@/lib/experimentalUi.client`): choosing Off / Dark / Light writes the `ap_ui` cookie and updates `<html>` `data-theme` / variant in place (no reload). When experimental is on: a search field filters experimental subsections; **Device** scope badges label cookie/localStorage prefs; **Hover delay (ms)** (`experimentalHoverDelay`), QoL checkboxes (`experimentalQolPrefs`), and **Experimental alerts** (`experimentalAlertPrefs`) — rally, combat, and active-route toasts, each off by default on this device.
 - Signature-indicator prefs (`showStale`, `showUnscanned`, `thresholdHours`) are local optimistic state. `commitSigPrefs(next)` persists all three at once (the action takes the full set): the hours field is parsed, clamped client-side to `[1 min, globalThresholdMinutes]`, converted to minutes (blank ⇒ `null` = use default), then sent via `setSignatureIndicatorPrefsAction`; failure rolls all three back and toasts. The threshold input is disabled when `showStale` is off. Server re-validates the cap.
 
 ### Emits / Calls
@@ -36,6 +37,7 @@ A roster list — each row shows portrait, name, role label (Member / Manager / 
 - `getCustomSoundStore().add(file)` / `.remove(id)`, `useCustomSounds()` — from `@/lib/sounds/customStore`
 
 ### Depends On
+- `@/lib/experimentalUi.client` — `useExperimentalUi`
 - `DeleteAccountDialog` — the type-to-confirm deletion flow
 - `SoundPicker` — the per-event sound select + preview button
 - `Dialog`, `Avatar`, `Button` UI primitives

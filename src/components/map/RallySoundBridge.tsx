@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { mapUpdateLoadSchema, type Envelope } from '@/lib/realtime/protocol';
 import { useRealtimeEvents } from '@/lib/realtime/useRealtime';
 import { getSoundEngine } from '@/lib/sounds/engine';
+import { shouldPlaySystemSound, useExperimentalSoundGate } from './ExperimentalSoundGate';
 
 /**
  * Turns a rally point being set on any system of the open map into the
@@ -15,6 +16,7 @@ import { getSoundEngine } from '@/lib/sounds/engine';
  * viewer who set the rally hears it too.
  */
 export function RallySoundBridge({ mapId }: { mapId: string }) {
+  const soundGate = useExperimentalSoundGate();
   useRealtimeEvents(
     useCallback(
       (envelope: Envelope) => {
@@ -23,6 +25,7 @@ export function RallySoundBridge({ mapId }: { mapId: string }) {
         if (!parsed.success || parsed.data.mapId !== Number(mapId)) return;
         const payload = parsed.data.data;
         if (payload?.kind !== 'system.updated' || payload.rallyAt == null) return;
+        if (!shouldPlaySystemSound(soundGate, payload.id, 'rallySet')) return;
 
         getSoundEngine().play('rallySet');
       },
