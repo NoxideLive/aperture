@@ -498,6 +498,13 @@
       "when": 1790033289128,
       "tag": "0071_user_sound_prefs",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1794498004735,
+      "tag": "0072_build2_active_route_favourites",
+      "breakpoints": true
     }
   ]
 }

@@ -14,9 +14,23 @@ export const SOUND_EVENTS = [
   'killInSystem',
   'rallySet',
   'systemPinged',
+  'activeRouteOffRoute',
+  'activeRouteLinkAlert',
 ] as const;
 
 export type SoundEvent = (typeof SOUND_EVENTS)[number];
+
+/** Account UI and bridges: shown only when experimental UI is active. */
+export const EXPERIMENTAL_SOUND_EVENTS = new Set<SoundEvent>([
+  'activeRouteOffRoute',
+  'activeRouteLinkAlert',
+]);
+
+/** Events that only offer chimes (no dedicated voice lines). */
+export const SOUND_EVENTS_WITHOUT_VOICE = new Set<SoundEvent>([
+  'activeRouteOffRoute',
+  'activeRouteLinkAlert',
+]);
 
 /** Chimes synthesized by `catalog.ts`. */
 export const CHIME_SOUND_IDS = [
@@ -71,9 +85,19 @@ export type SoundId = BuiltInSoundId | CustomSoundId;
  */
 export type SoundVariant = 'plain' | 'inbound' | 'outbound';
 
+export const EXPERIMENTAL_ALERT_TOAST_EVENTS = new Set<SoundEvent>([
+  'rallySet',
+  'activeRouteOffRoute',
+  'activeRouteLinkAlert',
+]);
+
 export type SoundEventPrefs = {
   enabled: boolean;
   sound: SoundId;
+  /** Experimental alert rows: in-app toast (opt-in, independent of master/system mutes). */
+  toast?: boolean;
+  /** Experimental alert rows: browser `Notification`. */
+  desktopNotification?: boolean;
 };
 
 export type SoundPrefs = {
@@ -94,8 +118,20 @@ export const DEFAULT_SOUND_PREFS: SoundPrefs = {
     pilotLeft: { enabled: false, sound: 'chime-down' },
     watchedJump: { enabled: false, sound: 'tick' },
     killInSystem: { enabled: false, sound: 'alarm' },
-    rallySet: { enabled: false, sound: 'bell' },
+    rallySet: { enabled: false, sound: 'bell', toast: false, desktopNotification: false },
     systemPinged: { enabled: false, sound: 'ping' },
+    activeRouteOffRoute: {
+      enabled: false,
+      sound: 'beeps',
+      toast: false,
+      desktopNotification: false,
+    },
+    activeRouteLinkAlert: {
+      enabled: false,
+      sound: 'tick-loud',
+      toast: false,
+      desktopNotification: false,
+    },
   },
 };
 
@@ -115,6 +151,8 @@ const soundIdSchema = z.custom<SoundId>(isSoundId, { message: 'unknown sound id'
 const soundEventPrefsSchema = z.object({
   enabled: z.boolean(),
   sound: soundIdSchema,
+  toast: z.boolean().optional(),
+  desktopNotification: z.boolean().optional(),
 });
 
 // System boundary: the blob arrives from the settings dialog before it lands in
@@ -130,6 +168,8 @@ export const soundPrefsSchema = z.object({
     killInSystem: soundEventPrefsSchema,
     rallySet: soundEventPrefsSchema,
     systemPinged: soundEventPrefsSchema,
+    activeRouteOffRoute: soundEventPrefsSchema,
+    activeRouteLinkAlert: soundEventPrefsSchema,
   }),
 });
 
@@ -145,10 +185,19 @@ function resolveVolume(raw: unknown): number {
 function resolveEventPrefs(raw: unknown, event: SoundEvent): SoundEventPrefs {
   const fallback = DEFAULT_SOUND_PREFS.events[event];
   if (!isRecord(raw)) return { ...fallback };
-  return {
+  const base: SoundEventPrefs = {
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : fallback.enabled,
     sound: isSoundId(raw.sound) ? raw.sound : fallback.sound,
   };
+  if (EXPERIMENTAL_ALERT_TOAST_EVENTS.has(event)) {
+    base.toast =
+      typeof raw.toast === 'boolean' ? raw.toast : (fallback.toast ?? false);
+    base.desktopNotification =
+      typeof raw.desktopNotification === 'boolean'
+        ? raw.desktopNotification
+        : (fallback.desktopNotification ?? false);
+  }
+  return base;
 }
 
 /**

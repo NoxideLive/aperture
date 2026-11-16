@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pulls a Server Action module (and with it Auth.js) into the graph; the
 // connection block never renders it.
 vi.mock('@/components/map/AddToRoutesItem', () => ({ AddToRoutesItem: () => null }));
+vi.mock('@/components/map/RouteHereItem', () => ({ RouteHereItem: () => null }));
 
 // Base UI's menu primitives need a real popup lifecycle jsdom can't provide, so
 // the menu chrome is stubbed down to plain elements; only which items render,
