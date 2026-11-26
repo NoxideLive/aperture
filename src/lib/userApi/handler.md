@@ -19,13 +19,19 @@ Whenever step 4/5 or 6 reports a strike, `applyUserApiStrike(tokenId)` is fired 
 - Success: the serve function's body, `{ ok: true, data, generatedAt }` (plus `hidden: true` on a withheld mass log), with its weak `ETag`.
 - Failure: `{ ok: false, error, code }`, `code` a `UserApiErrorCode` (`server_error` on a 500). 401s carry `WWW-Authenticate: Bearer`; `token_suspended` and 429s carry `Retry-After`.
 - Every response carries `cache-control: private, no-store`, `x-robots-tag: noindex`, `Access-Control-Allow-Origin: *` and the exposed-header list. Responses from step 6 onward, other than a 401, carry `RateLimit-Limit` and `RateLimit-Remaining` for one budget (the cap that refused a 429, otherwise whichever of the token's, account's and whole API's budget has the fewest requests left) and `RateLimit-Reset`; earlier refusals have no token budget to report.
-- `OPTIONS` answers a 204 preflight allowing `GET` with `Authorization` and `If-None-Match`.
+- `OPTIONS` answers a 204 preflight allowing `GET` with `Authorization` and `If-None-Match`, or `POST` with `Authorization` and `Content-Type` on mutation routes (and `Content-Type` only on public device routes).
 - `user_api_requests_total{endpoint,outcome}` is tallied for every `GET` response except the instance-switch 404; preflights are not counted. `http_requests_total` comes from `withApiMetrics` under the template `/api/v1/<endpoint>`.
 
 ---
 
 ### userApiRoute(endpoint: UserApiEndpoint, scope: ApiScope | null, serve: UserApiServe): UserApiRouteHandlers
 The `GET` and `OPTIONS` handlers of one route. `scope` is the scope the endpoint reads, or null for one any live token may call.
+
+### userApiMutationRoute(endpoint, scope, serve): UserApiMutationRouteHandlers
+Authenticated `POST` behind the same pipeline; a missing write scope answers `insufficient_scope`.
+
+### userApiPublicRoute(endpoint, serve, ipCheck): UserApiPublicRouteHandlers
+Unauthenticated `POST` for the device flow (instance switch + IP cap only).
 
 ---
 

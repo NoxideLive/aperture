@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- **Signature paste API** — maps whose managers expose the `signatures_write` scope accept `POST /api/v1/signatures/paste` with a bearer token. The body carries an EVE `systemId` and probe-scanner clipboard text; the server applies the same lazy-delete paste as the web UI (add, update, remove missing, keep orphaned connections). Changes are attributed to the token owner's main character and fan out through the usual signature map events.
+- **Device authorization for Eve's Little CoPilot** — `POST /api/v1/device/start` and `POST /api/v1/device/token` implement a short-lived device flow. A signed-in pilot approves at `/device?code=…`, picks a map, and the desktop app receives a normal `apu_` token once. Documented in [`docs/api/README.md`](docs/api/README.md).
+
+### Upgrading
+
+- Run `pnpm db:migrate` (migrations 0075–0076): adds the `signatures_write` API scope and the `ap_user_api_device` table.
+- Turn on **Signatures (write)** under Map Settings → API on each map that should accept pastes or device tokens that request that scope.
+
 ## v1.3.0
 
 More control over who sees what. Blackout hides pilot locations across the whole instance from everyone who isn't cleared, and the new user API lets members read a map into their own tools, but only on maps whose managers have switched it on. Sounds can also be muted per system, and pilots coming and going in your Home system are quiet by default.

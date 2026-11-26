@@ -87,7 +87,10 @@
 `pgEnum('share_presence_mode', ['none', 'anonymous', 'full'])` — roster disclosure level for a public map share on `ap_map_share.presence_mode`. `none` omits the roster entirely; `anonymous` emits per-system pilot counts with no names or character ids; `full` emits the roster minus account linkage (`userId`, `mainCharacterId`).
 
 ### apiScope
-`pgEnum('api_scope', ['map', 'signatures', 'pilots', 'notes', 'mass_log', 'kills'])` — a read-only data scope of the per-map user API (migration 0073). Exposed per map on `ap_map.api_scopes` and requested per token on `ap_map_api_token.scopes`; a request is served only for a scope in both. Plain nouns, so a later write scope can take a suffixed name without colliding.
+`pgEnum('api_scope', ['map', 'signatures', 'signatures_write', 'pilots', 'notes', 'mass_log', 'kills'])` — a data scope of the per-map user API (migration 0073; `signatures_write` in 0075). Exposed per map on `ap_map.api_scopes` and requested per token on `ap_map_api_token.scopes`; a request is served only for a scope in both. Plain nouns plus suffixed write names.
+
+### apiDeviceStatus
+`pgEnum('api_device_status', ['pending', 'approved', 'denied', 'expired', 'consumed'])` — lifecycle of a device-authorization row on `ap_user_api_device` (migration 0076).
 
 ### apiTokenRevokeReason
 `pgEnum('api_token_revoke_reason', ['creator', 'manager', 'abuse', 'admin'])` — why a user API token was revoked, on `ap_map_api_token.revoked_reason` (migration 0073): by its owning account, by a holder of `api_manage`, by the automatic abuse ladder, or by a global admin.

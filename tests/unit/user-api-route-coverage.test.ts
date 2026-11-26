@@ -39,14 +39,18 @@ describe('every /api/v1 route exports through the user API wrapper', () => {
     expect(routeFiles.length).toBeGreaterThanOrEqual(6);
   });
 
-  it.each(routeFiles)('%s builds its handlers with userApiRoute', (file) => {
+  it.each(routeFiles)('%s builds its handlers through the user API wrapper', (file) => {
     const src = readFileSync(file, 'utf8');
-    expect(src, `${file} must import userApiRoute from @/lib/userApi/handler`).toMatch(
-      /import\s*\{[^}]*\buserApiRoute\b[^}]*\}\s*from\s*'@\/lib\/userApi\/handler'/,
+    expect(
+      src,
+      `${file} must import a user API wrapper from @/lib/userApi/handler`,
+    ).toMatch(
+      /import\s*\{[^}]*\buserApi(?:Route|MutationRoute|PublicRoute)\b[^}]*\}\s*from\s*'@\/lib\/userApi\/handler'/,
     );
-    expect(src, `${file} must build \`const route = userApiRoute(...)\``).toMatch(
-      /const route = userApiRoute\(/,
-    );
+    expect(
+      src,
+      `${file} must build \`const route = userApi(Route|MutationRoute|PublicRoute)(...)\``,
+    ).toMatch(/const route = userApi(?:Route|MutationRoute|PublicRoute)\(/);
   });
 
   it.each(routeFiles)('%s exports only wrapper handlers and segment config', (file) => {
@@ -63,7 +67,11 @@ describe('every /api/v1 route exports through the user API wrapper', () => {
       ).toBe(true);
       if (method) methods.push(method[1]!);
     }
-    expect(methods, `${file} must export GET through the wrapper`).toContain('GET');
+    if (methods.includes('GET')) {
+      expect(methods, `${file} must export GET through the wrapper`).toContain('GET');
+    } else {
+      expect(methods, `${file} must export POST through the wrapper`).toContain('POST');
+    }
   });
 
   it.each([...routeFiles, HANDLER])('%s never reads a cookie or a session', (file) => {

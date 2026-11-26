@@ -49,6 +49,11 @@ const SCOPES: { scope: ApiScope; label: string; description: string }[] = [
     description: 'Every signature in the systems on the map.',
   },
   {
+    scope: 'signatures_write',
+    label: 'Signatures (write)',
+    description: 'Upload probe-scanner pastes into systems on the map.',
+  },
+  {
     scope: 'pilots',
     label: 'Pilots',
     description: 'Online tracked pilots and where they are, including pilot names and ships.',

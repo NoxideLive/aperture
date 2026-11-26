@@ -1,6 +1,6 @@
 # Aperture user API reference
 
-The user API lets a member of a map read that map's data from their own tools: a Discord bot, a spreadsheet, an overlay, a script. It is read-only. Every request is authorised by a per-map bearer token that a member creates in the map's settings.
+The user API lets a member of a map read that map's data from their own tools: a Discord bot, a spreadsheet, an overlay, a script — and, on maps whose managers allow it, upload probe-scanner pastes. Every request is authorised by a per-map bearer token that a member creates in the map's settings (or receives through the device flow below).
 
 This page is the consumer contract for `/api/v1/*`. Everything here describes how the API behaves today.
 
@@ -38,6 +38,7 @@ You can see and revoke every token you own, on every map, in **Account Settings,
 |---|---|---|
 | `map` | `/api/v1/map` | The map's header, its visible systems and its connections. |
 | `signatures` | `/api/v1/signatures` | Signatures in visible systems. |
+| `signatures_write` | `/api/v1/signatures/paste` | Upload a probe-scanner paste into one system on the map (lazy delete). |
 | `pilots` | `/api/v1/pilots` | Online tracked pilots: character names, their mains, their systems and ships. |
 | `notes` | `/api/v1/notes` | Free-standing map notes and each system's intel notes. |
 | `mass_log` | `/api/v1/mass-log` | The per-jump mass log of the map's connections, including the name of each pilot who jumped. |
@@ -71,7 +72,7 @@ The last condition means a token stops working when its owner leaves the corpora
 
 ## Responses
 
-All endpoints are `GET` and return JSON.
+Most endpoints are `GET`. `POST /api/v1/signatures/paste` and the device endpoints below are `POST`. All return JSON.
 
 **Success:**
 
@@ -301,6 +302,42 @@ Ids only: the API does not resolve victim or attacker names.
 
 So an empty list means "no kills Aperture knows about", not "no kills happened". Older cached rows can have `totalValue: null`.
 
+### `POST /api/v1/signatures/paste`
+
+Scope `signatures_write`. Applies the same lazy-delete bulk paste as the in-game **Lazy delete** shortcut: add missing signatures, update existing ones, remove ones absent from the paste, and leave orphaned wormhole connections in place.
+
+```json
+{ "systemId": 31000007, "text": "<probe scanner clipboard>" }
+```
+
+`systemId` is the **EVE solar-system id** of a system already on the map (not `ap_map_system.id`). The system is never auto-added.
+
+Success:
+
+```json
+{ "ok": true, "data": { "added": 1, "updated": 0, "removed": 0, "connectionsRemoved": 0 }, "generatedAt": "..." }
+```
+
+| HTTP | `code` | Meaning |
+|---|---|---|
+| 400 | `not_scanner_data` | The text did not parse as scanner output. |
+| 404 | `system_not_on_map` | That solar system is not on the token's map. |
+| 403 | `insufficient_scope` | The token or map does not grant `signatures_write`. |
+
+Paste text is capped at 65 536 characters.
+
+### Device authorization (`eves-little-copilot`)
+
+Desktop apps can mint a token without handling a password:
+
+1. `POST /api/v1/device/start` with `{ "client": "eves-little-copilot", "scopes": ["signatures", "signatures_write", ...] }` → `deviceCode`, `userCode`, `verificationUriComplete`, `interval`, `expiresIn` (about 10 minutes).
+2. Open `verificationUriComplete` in a browser while signed in with EVE SSO. Pick a map whose API is on and approve or deny.
+3. `POST /api/v1/device/token` with `{ "deviceCode": "..." }` (or `{ "userCode": "..." }` after approval) until the response includes `token`, `map`, `scopes`, `expiresAt`.
+
+Poll errors use `authorization_pending`, `slow_down`, `expired_token`, or `access_denied`. The raw token is returned **once** on the first successful poll, then the session is consumed.
+
+Managers must expose each requested scope on the map in **Map Settings → API** before approval can succeed.
+
 ## Errors
 
 | HTTP | `code` | Meaning | What to do |
@@ -310,7 +347,8 @@ So an empty list means "no kills Aperture knows about", not "no kills happened".
 | 403 | `token_suspended` | The token is suspended for ignoring rate limits. Carries `Retry-After`. | Wait for `Retry-After`. Requests sent while suspended count toward the next strike. |
 | 403 | `api_disabled` | The map's API is turned off. | Stop until a manager turns it back on. |
 | 403 | `access_lost` | The owning account has no main character, or its main can no longer view the map or sign in. | Stop. |
-| 403 | `scope_not_granted` | The endpoint's scope is not in the token's effective scopes. | Check `GET /api/v1/token`. |
+| 403 | `scope_not_granted` | The endpoint's read scope is not in the token's effective scopes. | Check `GET /api/v1/token`. |
+| 403 | `insufficient_scope` | A write endpoint's scope is not in the token's effective scopes. | Check `GET /api/v1/token`. |
 | 429 | `rate_limited` | A rate limit was hit. Carries `Retry-After`. | Wait for `Retry-After`. |
 | 500 | `server_error` | The server failed to build the response, usually a brief database outage. | Retry with backoff. |
 | 404 | none | The operator has turned the whole API off (body has no `code`), or the path does not exist. | |
@@ -392,7 +430,7 @@ Turning Blackout on or off, or changing the cleared list, applies to tokens on t
 
 ## CORS
 
-The API sends `Access-Control-Allow-Origin: *` and answers `OPTIONS` preflights allowing `GET` with the `Authorization` and `If-None-Match` headers. `ETag`, `Retry-After`, the `RateLimit-*` headers and `WWW-Authenticate` are exposed to scripts.
+The API sends `Access-Control-Allow-Origin: *`. Read endpoints answer `OPTIONS` preflights allowing `GET` with the `Authorization` and `If-None-Match` headers. Write and device endpoints allow `POST` with `Authorization` and `Content-Type` (device start/token use `Content-Type` only). `ETag`, `Retry-After`, the `RateLimit-*` headers and `WWW-Authenticate` are exposed to scripts.
 
 This is safe because the API never reads a cookie: authority comes only from the bearer token you send. A browser-based tool can call the API directly, but any token embedded in a web page is visible to everyone who can load that page.
 

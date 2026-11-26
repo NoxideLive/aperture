@@ -607,6 +607,18 @@ export const apertureConfig = {
   /** Minimum interval between two batched writes of token usage (`last_used_at`, `request_count`). */
   USER_API_USAGE_FLUSH_MS: 60_000,
 
+  /** Maximum probe-scanner paste body size for `POST /api/v1/signatures/paste`. */
+  USER_API_SIGNATURE_PASTE_MAX_TEXT: 65_536,
+
+  /** How long a device-authorization session lives before it expires. */
+  USER_API_DEVICE_EXPIRES_MS: 600_000,
+
+  /** Suggested poll interval returned from `POST /api/v1/device/start`. */
+  USER_API_DEVICE_POLL_INTERVAL_SEC: 5,
+
+  /** Device start + token poll requests per IP per rate window. */
+  USER_API_DEVICE_MAX_PER_IP: 120,
+
   /**
    * Outbound links the spectator view's promo bar offers a logged-out visitor.
    * The instance itself is always the deployment root, so it is not named here.

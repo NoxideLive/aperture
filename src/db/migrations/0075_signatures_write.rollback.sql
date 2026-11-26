@@ -1,0 +1,2 @@
+-- Manual rollback for 0075_signatures_write.sql.
+-- Postgres cannot remove enum values; no-op.

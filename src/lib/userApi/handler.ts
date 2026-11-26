@@ -15,6 +15,11 @@ import type {
   UserApiErrorCode,
   UserApiRequestOutcome,
   UserApiResource,
+  UserApiMutationOutcome,
+  UserApiMutationRouteHandlers,
+  UserApiMutationServe,
+  UserApiPublicRouteHandlers,
+  UserApiPublicServe,
   UserApiRouteHandlers,
   UserApiServe,
   UserApiServed,
@@ -61,6 +66,9 @@ const ERROR_TEXT: Record<UserApiErrorCode, string> = {
   access_lost: "This token's owner can no longer view the map.",
   rate_limited: 'Too many requests. Wait for Retry-After before sending another.',
   scope_not_granted: 'This token may not read this resource.',
+  insufficient_scope: 'This token does not have the scope this endpoint needs.',
+  not_scanner_data: 'The paste did not look like probe-scanner output.',
+  system_not_on_map: 'That solar system is not on this map.',
   server_error: 'The server failed to build this response. Retry later.',
 };
 
@@ -250,17 +258,131 @@ async function handle(
   );
 }
 
-async function preflight(): Promise<Response> {
+async function preflight(methods: string, headers: string): Promise<Response> {
   if (!(await isUserApiInstanceEnabled())) return notFound();
   return new Response(null, {
     status: 204,
     headers: {
       ...BASE_HEADERS,
-      'access-control-allow-methods': 'GET, OPTIONS',
-      'access-control-allow-headers': 'Authorization, If-None-Match',
+      'access-control-allow-methods': methods,
+      'access-control-allow-headers': headers,
       'access-control-max-age': '600',
     },
   });
+}
+
+function mutationJson(
+  outcome: UserApiMutationOutcome,
+  rateHeaders: RateHeaders,
+): Response {
+  if (outcome.ok) {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        data: outcome.data,
+        generatedAt: new Date().toISOString(),
+      }),
+      {
+        status: outcome.status ?? 200,
+        headers: { ...BASE_HEADERS, ...rateHeaders, 'content-type': 'application/json' },
+      },
+    );
+  }
+  const headers: Record<string, string> = {
+    ...BASE_HEADERS,
+    ...rateHeaders,
+    'content-type': 'application/json',
+  };
+  if (outcome.status === 401) headers['www-authenticate'] = 'Bearer';
+  const code = outcome.code as UserApiErrorCode;
+  const error = ERROR_TEXT[code] ?? outcome.error;
+  return new Response(JSON.stringify({ ok: false, error, code: outcome.code }), {
+    status: outcome.status,
+    headers,
+  });
+}
+
+async function handleMutation(
+  request: NextRequest,
+  endpoint: UserApiEndpoint,
+  scope: ApiScope,
+  serve: UserApiMutationServe,
+): Promise<Response> {
+  if (!(await isUserApiInstanceEnabled())) return notFound();
+
+  const ip = clientIpOfRequest(request.headers);
+  const gate = checkUserApiIp(ip);
+  if (!gate.ok) {
+    return finish(
+      endpoint,
+      'rate_limited',
+      failure(429, 'rate_limited', { retryAfterSec: gate.retryAfterSec }),
+    );
+  }
+
+  const decision = await authorizeUserApiBearer(request.headers.get('authorization'));
+  if (!decision.ok) {
+    if (decision.status === 401) {
+      return unauthorized(ip, endpoint, countsAsFailedAuth(decision.record));
+    }
+    if (decision.code === 'token_suspended' && decision.record !== null) {
+      const tokenId = decision.record.token.id;
+      if (noteUserApiSuspendedRequest(tokenId)) void applyUserApiStrike(tokenId);
+    }
+    return finish(
+      endpoint,
+      'forbidden',
+      failure(403, decision.code, { retryAfterSec: decision.retryAfterSec }),
+    );
+  }
+
+  const { record } = decision;
+  const tokenId = record.token.id;
+  const rate = consumeUserApiRequest(tokenId, record.account.userId);
+  const rateHeaders: RateHeaders = {
+    'ratelimit-limit': String(rate.limit),
+    'ratelimit-remaining': String(rate.remaining),
+    'ratelimit-reset': String(rate.resetSec),
+  };
+  if (!rate.ok) {
+    if (rate.strike) void applyUserApiStrike(tokenId);
+    return finish(
+      endpoint,
+      'rate_limited',
+      failure(429, 'rate_limited', { retryAfterSec: rate.retryAfterSec, headers: rateHeaders }),
+    );
+  }
+  recordUserApiUsage(tokenId);
+
+  const allowed = checkUserApiScope(record, scope);
+  if (!allowed.ok) {
+    return finish(
+      endpoint,
+      'forbidden',
+      failure(403, 'insufficient_scope', { headers: rateHeaders }),
+    );
+  }
+
+  try {
+    const outcome = await serve(request, record);
+    return finish(
+      endpoint,
+      outcome.ok ? 'ok' : 'forbidden',
+      mutationJson(outcome, rateHeaders),
+    );
+  } catch (err) {
+    const live = await isMapLive(record.map.id).catch(() => true);
+    if (!live) {
+      invalidateUserApiMap(record.map.id);
+      return unauthorized(ip, endpoint, false);
+    }
+    log.error('user API mutation failed', { endpoint, mapId: record.map.id.toString(), err });
+    return finish(
+      endpoint,
+      'error',
+      failure(500, 'server_error', { headers: rateHeaders }),
+    );
+  }
 }
 
 /**
@@ -275,7 +397,67 @@ export function userApiRoute(
   const template = `/api/v1/${endpoint}`;
   return {
     GET: withApiMetrics(template, (request: NextRequest) => handle(request, endpoint, scope, serve)),
-    OPTIONS: withApiMetrics(template, () => preflight()),
+    OPTIONS: withApiMetrics(
+      template,
+      () => preflight('GET, OPTIONS', 'Authorization, If-None-Match'),
+    ),
+  };
+}
+
+/**
+ * Authenticated `POST` mutation behind the same pipeline as reads, with a
+ * required scope and `insufficient_scope` when the token lacks it.
+ */
+export function userApiMutationRoute(
+  endpoint: UserApiEndpoint,
+  scope: ApiScope,
+  serve: UserApiMutationServe,
+): UserApiMutationRouteHandlers {
+  const template = `/api/v1/${endpoint}`;
+  return {
+    POST: withApiMetrics(template, (request: NextRequest) =>
+      handleMutation(request, endpoint, scope, serve),
+    ),
+    OPTIONS: withApiMetrics(
+      template,
+      () => preflight('POST, OPTIONS', 'Authorization, Content-Type'),
+    ),
+  };
+}
+
+/**
+ * Unauthenticated `POST` for the device-authorization flow. Instance switch and
+ * a dedicated IP cap only; no bearer and no session.
+ */
+export function userApiPublicRoute(
+  endpoint: UserApiEndpoint,
+  serve: UserApiPublicServe,
+  ipCheck: (ip: string) => { ok: true } | { ok: false; retryAfterSec: number },
+): UserApiPublicRouteHandlers {
+  const template = `/api/v1/${endpoint}`;
+  return {
+    POST: withApiMetrics(template, async (request: NextRequest) => {
+      if (!(await isUserApiInstanceEnabled())) return notFound();
+      const ip = clientIpOfRequest(request.headers);
+      const gate = ipCheck(ip);
+      if (!gate.ok) {
+        return finish(
+          endpoint,
+          'rate_limited',
+          failure(429, 'rate_limited', { retryAfterSec: gate.retryAfterSec }),
+        );
+      }
+      const outcome = await serve(request);
+      return finish(
+        endpoint,
+        outcome.ok ? 'ok' : 'forbidden',
+        mutationJson(outcome, {}),
+      );
+    }),
+    OPTIONS: withApiMetrics(
+      template,
+      () => preflight('POST, OPTIONS', 'Content-Type'),
+    ),
   };
 }
 

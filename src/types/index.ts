@@ -295,6 +295,9 @@ export type UserApiErrorCode =
   | 'access_lost'
   | 'rate_limited'
   | 'scope_not_granted'
+  | 'insufficient_scope'
+  | 'not_scanner_data'
+  | 'system_not_on_map'
   | 'server_error';
 
 /**
@@ -399,10 +402,13 @@ export type UserApiEndpoint =
   | 'token'
   | 'map'
   | 'signatures'
+  | 'signatures-paste'
   | 'pilots'
   | 'notes'
   | 'mass-log'
-  | 'kills';
+  | 'kills'
+  | 'device-start'
+  | 'device-token';
 
 /** Outcome label of `user_api_requests_total`. */
 export type UserApiRequestOutcome =
@@ -433,6 +439,14 @@ export type UserApiTokenInfo = {
 
 /** A resource the user API projects from one map (`src/lib/userApi/projection.ts`). */
 export type UserApiResource = 'map' | 'signatures' | 'pilots' | 'notes' | 'mass_log' | 'kills';
+
+/** One map row on the device authorization approval page. */
+export type DeviceApprovalMap = {
+  id: string;
+  name: string;
+  apiEnabled: boolean;
+  apiScopes: ApiScope[];
+};
 
 /** A visible system on the token's map. `id` is the `ap_map_system.id` that connection endpoints name. */
 export type UserApiSystem = {
@@ -642,6 +656,30 @@ export type UserApiServe = (
 /** The `GET` and `OPTIONS` exports of one `/api/v1/*` route. */
 export type UserApiRouteHandlers = {
   GET: (request: NextRequest, ctx: unknown) => Promise<Response>;
+  OPTIONS: (request: NextRequest, ctx: unknown) => Promise<Response>;
+};
+
+/** Success or failure from a user API write handler. */
+export type UserApiMutationOutcome =
+  | { ok: true; data: unknown; status?: number }
+  | { ok: false; status: number; code: string; error: string };
+
+/** Serves one authenticated `POST /api/v1/*` mutation. */
+export type UserApiMutationServe = (
+  request: NextRequest,
+  record: UserApiTokenRecord,
+) => Promise<UserApiMutationOutcome>;
+
+export type UserApiMutationRouteHandlers = {
+  POST: (request: NextRequest, ctx: unknown) => Promise<Response>;
+  OPTIONS: (request: NextRequest, ctx: unknown) => Promise<Response>;
+};
+
+/** Serves one unauthenticated `POST /api/v1/*` public handler (device flow). */
+export type UserApiPublicServe = (request: NextRequest) => Promise<UserApiMutationOutcome>;
+
+export type UserApiPublicRouteHandlers = {
+  POST: (request: NextRequest, ctx: unknown) => Promise<Response>;
   OPTIONS: (request: NextRequest, ctx: unknown) => Promise<Response>;
 };
 

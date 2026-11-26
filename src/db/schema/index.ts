@@ -39,4 +39,5 @@ export * from './ap/integration_token';
 export * from './ap/character_presence';
 export * from './ap/map_share';
 export * from './ap/map_api_token';
+export * from './ap/user_api_device';
 export * from './ap/sde_state';

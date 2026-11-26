@@ -298,10 +298,20 @@ export const errorSource = pgEnum('error_source', ['server', 'job', 'client']);
 export const apiScope = pgEnum('api_scope', [
   'map',
   'signatures',
+  'signatures_write',
   'pilots',
   'notes',
   'mass_log',
   'kills',
+]);
+
+/** Stage of a `/api/v1/device/*` authorization session. */
+export const apiDeviceStatus = pgEnum('api_device_status', [
+  'pending',
+  'approved',
+  'denied',
+  'expired',
+  'consumed',
 ]);
 
 /**
