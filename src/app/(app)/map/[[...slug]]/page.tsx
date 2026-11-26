@@ -6,6 +6,8 @@ import { loadMapForView, loadMapSettings } from '@/lib/map/loadMap';
 import { loadLiveShareBadges } from '@/lib/map/share';
 import { canManageMap, resolveMapCapabilities } from '@/lib/auth/rights';
 import { loadRouteConfig } from '@/lib/map/routeConfig';
+import { loadMapRouteFavourites } from '@/lib/map/mapRouteFavourites';
+import { loadMapActiveRouteForUser } from '@/lib/map/mapActiveRoute';
 import { statsForSystems } from '@/lib/map/stats';
 import { intelForSystems } from '@/lib/map/intel';
 import { structuresForSystems } from '@/lib/structures/read';
@@ -18,6 +20,7 @@ import {
   getSignatureIndicatorPrefs,
   requireSession,
 } from '@/lib/session';
+import { getExperimentalUiFromCookies } from '@/lib/experimentalUi.server';
 
 function parseMapId(slug?: string[]): bigint | null {
   const raw = slug?.[0];
@@ -43,7 +46,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     );
   }
 
-  const data = await loadMapForView(mapId, BigInt(session.characterId));
+  const data = await loadMapForView(mapId, BigInt(session.characterId), session.userId);
   if (!data) {
     return (
       <EmptyState title="Map not found" description="This map doesn't exist or has been deleted." />
@@ -51,6 +54,7 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
   }
 
   const systemIds = data.systems.map((s) => s.systemId);
+  const experimentalUi = await getExperimentalUiFromCookies();
   const [
     stats,
     intel,
@@ -66,6 +70,8 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     capabilities,
     liveShares,
     intelTenant,
+    mapRouteFavourites,
+    mapActiveRoute,
   ] = await Promise.all([
     statsForSystems(systemIds),
     intelForSystems(systemIds),
@@ -81,6 +87,8 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
     resolveMapCapabilities(BigInt(session.characterId), mapId),
     loadLiveShareBadges(mapId),
     requireIntelTenant(mapId, BigInt(session.characterId)),
+    loadMapRouteFavourites(mapId, session.userId),
+    loadMapActiveRouteForUser(mapId, session.userId),
   ]);
 
   // Active characters drive both the CTRL+V paste location check (ids) and the
@@ -114,9 +122,13 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
         viewerCharacterIds={viewerCharacterIds}
         viewerCharacters={viewerCharacters}
         mainCharacterId={mainCharacterId == null ? null : Number(mainCharacterId)}
+        viewerUserId={session.userId}
         routePrefs={routeConfig.prefs}
         routeDestinations={routeConfig.destinations}
         mapLayout={mapLayout}
+        initialExperimentalUi={experimentalUi}
+        mapRouteFavourites={mapRouteFavourites}
+        mapActiveRoute={mapActiveRoute}
       />
     </>
   );

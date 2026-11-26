@@ -5,6 +5,7 @@ import {
   type ChimeSoundId,
   type SoundEvent,
   type SoundId,
+  type SoundMuteGroup,
   type SoundVariant,
   type VoicePackId,
   type VoiceSoundId,
@@ -209,6 +210,8 @@ const VOICE_EVENT_STEMS: Record<SoundEvent, string> = {
   killInSystem: 'kill',
   rallySet: 'rally',
   systemPinged: 'ping',
+  activeRouteOffRoute: 'ping',
+  activeRouteLinkAlert: 'kill',
 };
 
 const VOICE_VARIANTS: readonly SoundVariant[] = ['plain', 'inbound', 'outbound'];
@@ -287,10 +290,29 @@ export const SOUND_EVENT_LABELS: Record<SoundEvent, { label: string; description
   },
   rallySet: {
     label: 'Rally set',
-    description: 'Someone sets a rally point on a system on this map.',
+    description:
+      'Someone sets a rally point on a system on this map. With experimental UI, shows an in-app toast when enabled.',
   },
   systemPinged: {
     label: 'System pinged',
     description: 'Someone pings a system on this map.',
   },
+  activeRouteOffRoute: {
+    label: 'Active route off-route (Experimental)',
+    description:
+      'A tracked follower is not on the active route hop list — plays a cue and shows an in-app toast.',
+  },
+  activeRouteLinkAlert: {
+    label: 'Active route link alert (Experimental)',
+    description:
+      'A wormhole on the active route is deleted or reaches critical EOL — plays a cue and shows an in-app toast.',
+  },
 };
+
+/** Name and tooltip for each system mute group, shared by the settings dialog, the map menu and the node badge. */
+export const SOUND_MUTE_GROUP_LABELS: Record<SoundMuteGroup, { label: string; description: string }> =
+  {
+    kills: { label: 'Kills', description: 'Kill on the map' },
+    pilots: { label: 'Pilots', description: 'Pilot arrives and Pilot leaves' },
+    alerts: { label: 'Rally & ping', description: 'Rally set and System pinged' },
+  };

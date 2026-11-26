@@ -35,7 +35,8 @@ export function ConnectionDetailPopover({
   children: ReactNode;
 }) {
   const [reference, setReference] = useState<WormholeJumpInfoRow | null>(null);
-  const [massLogged, setMassLogged] = useState<number | null>(null);
+  // 'hidden': Blackout withholds the mass log from this viewer.
+  const [massLogged, setMassLogged] = useState<number | 'hidden' | null>(null);
 
   const load = () => {
     // Reference is keyed on the wormhole type: fetch when we don't yet hold the
@@ -48,7 +49,8 @@ export function ConnectionDetailPopover({
     }
     // Refetch every open so the cumulative can't lag behind newly logged jumps.
     void fetchConnectionMassLog({ mapId, connectionId: connection.id }).then((result) => {
-      setMassLogged(result.ok && result.data.length > 0 ? result.data[0]!.cumulativeMass : 0);
+      if (result.ok && result.hidden) setMassLogged('hidden');
+      else setMassLogged(result.ok && result.data.length > 0 ? result.data[0]!.cumulativeMass : 0);
     });
   };
 
@@ -56,7 +58,7 @@ export function ConnectionDetailPopover({
     <Tooltip.Root onOpenChange={(open) => open && load()}>
       <Tooltip.Trigger
         render={<div />}
-        className="nodrag nopan pointer-events-auto flex items-center gap-1 rounded bg-card/90 px-1.5 py-0.5 text-[11px] font-semibold leading-none ring-1 ring-foreground/10"
+        className="ap-connection-badge-trigger nodrag nopan pointer-events-auto flex items-center gap-1 rounded bg-card/90 px-1.5 py-0.5 text-[11px] font-semibold leading-none ring-1 ring-foreground/10"
       >
         {children}
       </Tooltip.Trigger>
@@ -85,16 +87,19 @@ function DetailRows({
   connection: MapConnectionEdge;
   wormholeCode: string | null;
   reference: WormholeJumpInfoRow | null;
-  massLogged: number | null;
+  massLogged: number | 'hidden' | null;
 }) {
   const totalMass = reference?.totalMass ?? null;
-  const pct = massLogged !== null && totalMass ? Math.round((massLogged / totalMass) * 100) : null;
+  const pct =
+    typeof massLogged === 'number' && totalMass ? Math.round((massLogged / totalMass) * 100) : null;
   const massLoggedText =
     massLogged === null
       ? '…'
-      : pct !== null
-        ? `${formatWormholeMass(massLogged)} (${pct}%)`
-        : formatWormholeMass(massLogged);
+      : massLogged === 'hidden'
+        ? 'Hidden during Blackout'
+        : pct !== null
+          ? `${formatWormholeMass(massLogged)} (${pct}%)`
+          : formatWormholeMass(massLogged);
 
   return (
     <>
