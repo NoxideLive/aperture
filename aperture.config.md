@@ -62,6 +62,12 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `USER_API_HOT_WINDOW_REJECTS`, `USER_API_STRIKE_HOT_WINDOWS`, `USER_API_STRIKE_SPAN_MS` — refusals that make a window hot, and hot windows within the span that make a strike.
 - `USER_API_STRIKE_DECAY_DAYS`, `USER_API_STRIKE_SUSPENSIONS_MS`, `USER_API_FIRST_BLOCK_DAYS`, `USER_API_REPEAT_OFFENCE_WINDOW_DAYS` — the abuse ladder (`src/lib/userApi/abuse.ts`): strike decay, the strike 1 and 2 suspensions, and the first and repeat automatic account blocks.
 - `USER_API_USAGE_FLUSH_MS` — minimum interval between batched token-usage writes (`src/lib/userApi/usage.ts`).
+- `USER_API_SIGNATURE_PASTE_MAX_TEXT` (65 536) — maximum `text` body size on `POST /api/v1/signatures/paste` (`src/lib/userApi/signaturePaste.ts`).
+- `USER_API_DEVICE_EXPIRES_MS` (10 min) — lifetime of a device-authorization session before it expires.
+- `USER_API_DEVICE_POLL_INTERVAL_SEC` — minimum poll spacing returned from `POST /api/v1/device/start` and enforced on `POST /api/v1/device/token`.
+- `USER_API_DEVICE_MAX_PER_IP` — cap on device `start` and `token` requests per IP per rate window (`checkDeviceIp` in `src/lib/userApi/device.ts`).
+- `USER_API_DEVICE_RETENTION_DAYS` — how long consumed, denied, and expired device sessions are kept before the cleanup job deletes them.
+- `USER_API_DEVICE_CLEANUP_CRON` — cadence for `user-api-device-cleanup` (`src/lib/jobs/tasks/userApiDeviceCleanup.ts`).
 
 **Authz / character cleanup**
 - `CHARACTER_CLEANUP_CRON`, `CHARACTER_AUTHZ_RESYNC_STALE_AFTER_MS`, `CHARACTER_AUTHZ_RESYNC_BATCH_SIZE` — cadence and throttle for the `character-cleanup` job's kick-expiry + authz resync passes.

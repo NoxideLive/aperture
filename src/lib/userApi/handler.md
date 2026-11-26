@@ -15,12 +15,19 @@ Authority comes from `Authorization: Bearer` alone; nothing here reads a cookie 
 
 Whenever step 4/5 or 6 reports a strike, `applyUserApiStrike(tokenId)` is fired without awaiting.
 
+### Pipeline (`POST`, authenticated mutation)
+Same order as `GET`, through scope, except a required write scope answers 403 `insufficient_scope` instead of `scope_not_granted`, and the handler returns a `UserApiMutationOutcome` serialized by `mutationJson` rather than a cached projection body. If serving throws and the map is gone or soft-deleted, the answer is the same 401 as any dead token; any other error is logged and answers 500 `server_error`.
+
+### Pipeline (`POST`, public device routes)
+Instance switch, then the route's `ipCheck` (for device endpoints, `checkDeviceIp`); a refusal is 429 `rate_limited` with `Retry-After`. The serve function runs inside `try/catch`; an uncaught throw is logged and answered as 500 `server_error` through `mutationJson`.
+
 ### Responses
 - Success: the serve function's body, `{ ok: true, data, generatedAt }` (plus `hidden: true` on a withheld mass log), with its weak `ETag`.
 - Failure: `{ ok: false, error, code }`, `code` a `UserApiErrorCode` (`server_error` on a 500). 401s carry `WWW-Authenticate: Bearer`; `token_suspended` and 429s carry `Retry-After`.
+- Mutation and public-route failures from `mutationJson` mirror the same envelope. When `UserApiMutationOutcome` carries `retryAfterSec` (for example `slow_down` on device poll), `mutationJson` sets the `Retry-After` header.
 - Every response carries `cache-control: private, no-store`, `x-robots-tag: noindex`, `Access-Control-Allow-Origin: *` and the exposed-header list. Responses from step 6 onward, other than a 401, carry `RateLimit-Limit` and `RateLimit-Remaining` for one budget (the cap that refused a 429, otherwise whichever of the token's, account's and whole API's budget has the fewest requests left) and `RateLimit-Reset`; earlier refusals have no token budget to report.
 - `OPTIONS` answers a 204 preflight allowing `GET` with `Authorization` and `If-None-Match`, or `POST` with `Authorization` and `Content-Type` on mutation routes (and `Content-Type` only on public device routes).
-- `user_api_requests_total{endpoint,outcome}` is tallied for every `GET` response except the instance-switch 404; preflights are not counted. `http_requests_total` comes from `withApiMetrics` under the template `/api/v1/<endpoint>`.
+- `user_api_requests_total{endpoint,outcome}` is tallied for every `GET` and `POST` response except the instance-switch 404; preflights are not counted. `mutationMetricOutcome` maps mutation refusals with HTTP 400, 404, and 413 (and any other sub-500 status besides 401/403/429) to outcome `error`. `http_requests_total` comes from `withApiMetrics` under the template `/api/v1/<endpoint>`.
 
 ---
 
@@ -55,4 +62,4 @@ The `kills` projection narrowed per request: kills at or after `?since=<ISO>` (d
 - `@/lib/http/clientKey`, `@/lib/metrics/httpInstrumentation` (`withApiMetrics`), `@/lib/metrics/registry` (`recordUserApiRequest`).
 - Schema: `ap_map` (the liveness check on a failed serve), `api_scope`.
 - Types: `UserApiServe` (called only for a record that passed every gate), `UserApiServed`, `UserApiRouteHandlers`.
-- `aperture.config` (`USER_API_MAX_PER_TOKEN`, `USER_API_MAX_PER_ACCOUNT`, `USER_API_RATE_WINDOW_MS`, `USER_API_KILLS_DEFAULT_SINCE_MS`, `USER_API_KILLS_MAX_AGE_DAYS`, `USER_API_KILLS_MAX_LIMIT`).
+- `aperture.config` (`USER_API_MAX_PER_TOKEN`, `USER_API_MAX_PER_ACCOUNT`, `USER_API_RATE_WINDOW_MS`, `USER_API_KILLS_DEFAULT_SINCE_MS`, `USER_API_KILLS_MAX_AGE_DAYS`, `USER_API_KILLS_MAX_LIMIT`, device and paste limits as used by the public and mutation routes).
