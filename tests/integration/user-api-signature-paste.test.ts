@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@/db/client';
@@ -38,6 +38,7 @@ const REGION = 97349102;
 const CONSTELLATION = 97349103;
 const SYSTEM_ID = 97349104;
 const SCAN = 'UNO-708\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t17.43 AU\n';
+const MAP_NAME = 'Paste API Map';
 
 describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
   let mapId = 0n;
@@ -45,11 +46,7 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
 
   beforeAll(async () => {
     await migrate(db, { migrationsFolder: 'src/db/migrations' });
-    await db.delete(apMapApiToken);
-    await db.delete(apMapSystem);
-    await db.delete(apMap);
-    await db.delete(apCharacter).where(eq(apCharacter.corporationId, CORP));
-    await db.delete(apUser);
+    await cleanup();
 
     await db
       .insert(apInstance)
@@ -62,18 +59,32 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
       .insert(apInstanceOwner)
       .values({ principalKind: 'corporation', principalId: CORP })
       .onConflictDoNothing();
-    await db.insert(apCorporation).values({ id: CORP, name: 'Paste API Corp' });
+    await db
+      .insert(apCorporation)
+      .values({ id: CORP, name: 'Paste API Corp' })
+      .onConflictDoUpdate({ target: apCorporation.id, set: { name: 'Paste API Corp' } });
     const [u] = await db.insert(apUser).values({}).returning({ id: apUser.id });
-    await db.insert(apCharacter).values({
-      id: MAIN,
-      userId: u!.id,
-      name: 'Paste API Main',
-      ownerHash: 'paste-api-hash',
-      authzLevel: 'member',
-      corporationId: CORP,
-      allianceId: null,
-      status: 'active',
-    });
+    await db
+      .insert(apCharacter)
+      .values({
+        id: MAIN,
+        userId: u!.id,
+        name: 'Paste API Main',
+        ownerHash: 'paste-api-hash',
+        authzLevel: 'member',
+        corporationId: CORP,
+        allianceId: null,
+        status: 'active',
+      })
+      .onConflictDoUpdate({
+        target: apCharacter.id,
+        set: {
+          userId: u!.id,
+          name: 'Paste API Main',
+          corporationId: CORP,
+          status: 'active',
+        },
+      });
     await db.update(apUser).set({ mainCharacterId: MAIN }).where(eq(apUser.id, u!.id));
     await db.insert(universeRegion).values({ id: REGION, name: 'API Paste Region' }).onConflictDoNothing();
     await db
@@ -109,7 +120,7 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
     const [map] = await db
       .insert(apMap)
       .values({
-        name: 'Paste API Map',
+        name: MAP_NAME,
         scope: 'wh',
         type: 'corp',
         ownerCorporationId: CORP,
@@ -197,3 +208,26 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
     expect(body.code).toBe('not_scanner_data');
   });
 });
+
+async function cleanup() {
+  const maps = await db
+    .select({ id: apMap.id })
+    .from(apMap)
+    .where(eq(apMap.name, MAP_NAME));
+  for (const m of maps) {
+    await db.delete(apMapApiToken).where(eq(apMapApiToken.mapId, m.id));
+    await db.delete(apMapSystem).where(eq(apMapSystem.mapId, m.id));
+  }
+  await db.delete(apMap).where(eq(apMap.name, MAP_NAME));
+  await db
+    .delete(apInstanceOwner)
+    .where(and(eq(apInstanceOwner.principalKind, 'corporation'), eq(apInstanceOwner.principalId, CORP)));
+  const users = await db
+    .select({ userId: apCharacter.userId })
+    .from(apCharacter)
+    .where(eq(apCharacter.id, MAIN));
+  await db.delete(apCharacter).where(eq(apCharacter.id, MAIN));
+  const userIds = users.map((u) => u.userId);
+  if (userIds.length > 0) await db.delete(apUser).where(inArray(apUser.id, userIds));
+  await db.delete(apCorporation).where(eq(apCorporation.id, CORP));
+}

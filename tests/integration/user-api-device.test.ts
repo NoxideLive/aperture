@@ -1,15 +1,17 @@
 // @vitest-environment node
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { NextRequest } from 'next/server';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, pool } from '@/db/client';
 import { apInstance, apUserApiDevice } from '@/db/schema';
 import { POST as startPOST } from '@/app/api/v1/device/start/route';
 import { POST as tokenPOST } from '@/app/api/v1/device/token/route';
 import { __resetUserApiDeviceRateLimit } from '@/lib/userApi/device';
 import { invalidateUserApiInstanceSwitch } from '@/lib/userApi/instance';
+import { apertureConfig } from '../../aperture.config';
 
 const run = process.env.RUN_DB_TESTS === '1';
+const POLL_MS = apertureConfig.USER_API_DEVICE_POLL_INTERVAL_SEC * 1000;
 
 describe.skipIf(!run)('Device authorization API', () => {
   beforeAll(async () => {
@@ -24,9 +26,15 @@ describe.skipIf(!run)('Device authorization API', () => {
   });
 
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now());
     __resetUserApiDeviceRateLimit();
     invalidateUserApiInstanceSwitch();
     await db.delete(apUserApiDevice);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   afterAll(async () => {
@@ -62,6 +70,8 @@ describe.skipIf(!run)('Device authorization API', () => {
     expect(poll.status).toBe(400);
     const body = await poll.json();
     expect(body.code).toBe('authorization_pending');
+
+    vi.advanceTimersByTime(POLL_MS + 1);
 
     const byUser = await tokenPOST(
       new NextRequest('http://localhost/api/v1/device/token', {
