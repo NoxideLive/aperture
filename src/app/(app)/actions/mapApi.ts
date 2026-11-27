@@ -20,7 +20,7 @@ import {
   isUserApiAccountBlocked,
 } from '@/lib/userApi/authorize';
 import { isUserApiInstanceEnabled } from '@/lib/userApi/instance';
-import { generateUserApiToken } from '@/lib/userApi/token';
+import { mintMapApiTokenForAccount } from '@/lib/userApi/mint';
 import type {
   AccountApiState,
   ApiScope,
@@ -399,7 +399,6 @@ export async function updateMapApiSettings(
 }
 
 const EXPIRY_DAYS = [30, 90, 365] as const;
-const DAY_MS = 86_400_000;
 
 const createSchema = z.object({
   mapId: mapIdSchema,
@@ -459,80 +458,16 @@ export async function createMapApiToken(
     return { ok: false, error: "Your account's main character cannot use the API on this map." };
   }
 
-  const { token, hash, prefix } = generateUserApiToken();
-  const now = new Date();
-  const expiresAt =
-    expiresInDays === null ? null : new Date(now.getTime() + expiresInDays * DAY_MS);
-
-  const result = await commitMapEvent({
+  const minted = await mintMapApiTokenForAccount({
     mapId,
-    characterId: actorId,
-    kind: 'api.token_created',
-    mutate: async (tx) => {
-      const [account] = await tx
-        .select({
-          apiBlockedAt: apUser.apiBlockedAt,
-          apiBlockedUntil: apUser.apiBlockedUntil,
-        })
-        .from(apUser)
-        .where(eq(apUser.id, userId))
-        .for('update');
-      if (!account) throw new Error('Account not found.');
-      if (isUserApiAccountBlocked(account, now)) {
-        throw new Error('API access is blocked for your account.');
-      }
-
-      const [map] = await tx
-        .select({ apiEnabled: apMap.apiEnabled, apiScopes: apMap.apiScopes })
-        .from(apMap)
-        .where(eq(apMap.id, mapId));
-      if (!map?.apiEnabled) throw new Error('The API is turned off on this map.');
-      const exposed = new Set(map.apiScopes);
-      if (scopes.some((s) => !exposed.has(s))) {
-        throw new Error('This map does not expose every scope you chose.');
-      }
-
-      const [onMap] = await tx
-        .select({ n: count() })
-        .from(apMapApiToken)
-        .where(
-          and(
-            eq(apMapApiToken.userId, userId),
-            eq(apMapApiToken.mapId, mapId),
-            liveTokenPredicate(now),
-          ),
-        );
-      if ((onMap?.n ?? 0) >= apertureConfig.USER_API_MAX_TOKENS_PER_ACCOUNT_PER_MAP) {
-        throw new Error(
-          `You already have ${apertureConfig.USER_API_MAX_TOKENS_PER_ACCOUNT_PER_MAP} live tokens on this map. Revoke one first.`,
-        );
-      }
-      const [onAccount] = await tx
-        .select({ n: count() })
-        .from(apMapApiToken)
-        .where(and(eq(apMapApiToken.userId, userId), liveTokenPredicate(now)));
-      if ((onAccount?.n ?? 0) >= apertureConfig.USER_API_MAX_TOKENS_PER_ACCOUNT) {
-        throw new Error(
-          `Your account already has ${apertureConfig.USER_API_MAX_TOKENS_PER_ACCOUNT} live tokens. Revoke one first.`,
-        );
-      }
-
-      const [row] = await tx
-        .insert(apMapApiToken)
-        .values({ mapId, userId, tokenHash: hash, tokenPrefix: prefix, label, scopes, expiresAt })
-        .returning({ id: apMapApiToken.id });
-      return {
-        tokenId: row!.id.toString(),
-        label,
-        scopes,
-        expiresAt: expiresAt?.toISOString() ?? null,
-      };
-    },
+    userId,
+    actorCharacterId: actorId,
+    label,
+    scopes,
+    expiresInDays,
   });
-
-  if (!result.ok) return { ok: false, error: result.error };
-  if (result.data.kind !== 'api.token_created') return { ok: false, error: 'Mint failed.' };
-  return { ok: true, data: { token, tokenId: result.data.tokenId } };
+  if (!minted.ok) return { ok: false, error: minted.error };
+  return { ok: true, data: { token: minted.token, tokenId: minted.tokenId } };
 }
 
 /**

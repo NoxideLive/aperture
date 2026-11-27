@@ -43,8 +43,5 @@ export const apUserApiDevice = pgTable(
     mintedTokenEnc: text('minted_token_enc'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index('ap_user_api_device_user_code_idx').on(t.userCode),
-    index('ap_user_api_device_expires_at_idx').on(t.expiresAt),
-  ],
+  (t) => [index('ap_user_api_device_expires_at_idx').on(t.expiresAt)],
 );

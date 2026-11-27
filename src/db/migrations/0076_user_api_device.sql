@@ -29,5 +29,4 @@ ALTER TABLE "ap_user_api_device" ADD CONSTRAINT "ap_user_api_device_user_id_ap_u
 ALTER TABLE "ap_user_api_device" ADD CONSTRAINT "ap_user_api_device_map_id_ap_map_id_fk" FOREIGN KEY ("map_id") REFERENCES "public"."ap_map"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ap_user_api_device" ADD CONSTRAINT "ap_user_api_device_approved_by_character_id_ap_character_id_fk" FOREIGN KEY ("approved_by_character_id") REFERENCES "public"."ap_character"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ap_user_api_device" ADD CONSTRAINT "ap_user_api_device_minted_token_id_ap_map_api_token_id_fk" FOREIGN KEY ("minted_token_id") REFERENCES "public"."ap_map_api_token"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "ap_user_api_device_user_code_idx" ON "ap_user_api_device" USING btree ("user_code");--> statement-breakpoint
 CREATE INDEX "ap_user_api_device_expires_at_idx" ON "ap_user_api_device" USING btree ("expires_at");

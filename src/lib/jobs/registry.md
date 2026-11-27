@@ -54,4 +54,5 @@ The retry budget the task is registered with, or `null` when it has none. Caller
 - Registers `sde-refresh`, the daily 12:15 UTC cron that checks CCP's published SDE build against `ap_sde_state` and ingests a newer one through the same isolated child-process path as `sde-ingest`.
 - Registers `metrics-snapshot`, the 1-minute cron that samples the metric registry + gauges into `ap_metric_snapshot` for the admin metrics page's history graphs.
 - Registers `killmail-cleanup`, the daily cron that deletes `universe_killmail` cache rows older than `KILLMAIL_CACHE_RETENTION_DAYS` by kill time.
+- Registers `user-api-device-cleanup`, the hourly cron (`USER_API_DEVICE_CLEANUP_CRON`) that deletes expired pending sessions and aged terminal rows from `ap_user_api_device` (`src/lib/jobs/tasks/userApiDeviceCleanup.ts`).
 - ESI cannot return other corps' structures, so structure intel is manual entry (`ap_structure`) with no recurring resolve job.

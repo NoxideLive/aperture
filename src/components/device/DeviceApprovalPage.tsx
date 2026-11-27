@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
+import { Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -30,6 +32,8 @@ export function DeviceApprovalPage({ userCode }: { userCode: string }) {
   const [mapId, setMapId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<'approved' | 'denied' | null>(null);
+  const [mintedToken, setMintedToken] = useState<string | null>(null);
+  const [mapName, setMapName] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const load = useCallback(async () => {
@@ -44,7 +48,7 @@ export function DeviceApprovalPage({ userCode }: { userCode: string }) {
     }
     setClient(res.data.client);
     setScopes(res.data.scopes);
-    setMaps(res.data.maps.filter((m) => m.apiEnabled));
+    setMaps(res.data.maps);
     setError(null);
   }, [userCode]);
 
@@ -63,22 +67,58 @@ export function DeviceApprovalPage({ userCode }: { userCode: string }) {
     start(async () => {
       const res = await submitDeviceApproval({
         userCode,
-        mapId: approve ? mapId : maps[0]?.id ?? '0',
+        mapId: approve ? mapId : undefined,
         approve,
       });
       if (!res.ok) {
-        setError(res.error);
+        setError('error' in res ? res.error : 'Request failed.');
         return;
+      }
+      if ('data' in res && res.data?.token) {
+        setMintedToken(res.data.token);
+        setMapName(res.data.mapName);
       }
       setDone(approve ? 'approved' : 'denied');
     });
+  };
+
+  const copyToken = async () => {
+    if (!mintedToken) return;
+    try {
+      await navigator.clipboard.writeText(mintedToken);
+      toast.success('Token copied.');
+    } catch {
+      toast.error('Could not copy.');
+    }
   };
 
   if (done === 'approved') {
     return (
       <main className="mx-auto max-w-lg px-4 py-16">
         <h1 className="text-xl font-semibold">Approved</h1>
-        <p className="mt-2 text-muted-foreground">Return to your app to finish connecting.</p>
+        {mapName ? (
+          <p className="mt-2 text-muted-foreground">
+            Token for <span className="font-medium text-foreground">{mapName}</span>.
+          </p>
+        ) : null}
+        {mintedToken ? (
+          <div className="mt-6 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Copy this token into your app. It is shown once and cannot be retrieved again.
+            </p>
+            <div className="flex gap-2">
+              <code className="flex-1 break-all rounded border px-3 py-2 text-xs">{mintedToken}</code>
+              <Button type="button" variant="outline" size="icon" onClick={() => void copyToken()}>
+                <Copy className="size-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Or return to the app and wait for it to pick up the token automatically.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-muted-foreground">Return to your app to finish connecting.</p>
+        )}
       </main>
     );
   }
@@ -109,7 +149,7 @@ export function DeviceApprovalPage({ userCode }: { userCode: string }) {
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
       {maps.length === 0 && !error ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          No maps with the API on. Turn it on in Map Settings first.
+          No maps expose these scopes with the API on. Turn it on in Map Settings first.
         </p>
       ) : null}
       {maps.length > 0 ? (
@@ -131,16 +171,16 @@ export function DeviceApprovalPage({ userCode }: { userCode: string }) {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex gap-2">
-            <Button disabled={pending} onClick={() => submit(true)}>
-              Approve
-            </Button>
-            <Button variant="outline" disabled={pending} onClick={() => submit(false)}>
-              Deny
-            </Button>
-          </div>
+          <Button disabled={pending} onClick={() => submit(true)}>
+            Approve
+          </Button>
         </div>
       ) : null}
+      <div className="mt-6">
+        <Button variant="outline" disabled={pending} onClick={() => submit(false)}>
+          Deny
+        </Button>
+      </div>
     </main>
   );
 }

@@ -619,6 +619,12 @@ export const apertureConfig = {
   /** Device start + token poll requests per IP per rate window. */
   USER_API_DEVICE_MAX_PER_IP: 120,
 
+  /** How long consumed/denied/expired device sessions are kept before reaping. */
+  USER_API_DEVICE_RETENTION_DAYS: 7,
+
+  /** Cron for `user-api-device-cleanup`. */
+  USER_API_DEVICE_CLEANUP_CRON: '17 * * * *',
+
   /**
    * Outbound links the spectator view's promo bar offers a logged-out visitor.
    * The instance itself is always the deployment root, so it is not named here.

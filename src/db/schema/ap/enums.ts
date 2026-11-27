@@ -290,10 +290,10 @@ export const errorLevel = pgEnum('error_level', ['warn', 'error', 'fatal']);
 export const errorSource = pgEnum('error_source', ['server', 'job', 'client']);
 
 /**
- * A read-only data scope of the per-map user API. Granted on `ap_map.api_scopes`
- * by a manager and requested on `ap_map_api_token.scopes` at mint; a request is
- * served only for a scope in both. Plain nouns so a later write scope can take a
- * suffixed name without colliding.
+ * A data scope of the per-map user API. Granted on `ap_map.api_scopes` by a
+ * manager and requested on `ap_map_api_token.scopes` at mint; a request is
+ * served only for a scope in both. Read scopes use plain nouns; write scopes use a
+ * `_write` suffix (`signatures_write`).
  */
 export const apiScope = pgEnum('api_scope', [
   'map',

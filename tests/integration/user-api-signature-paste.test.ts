@@ -43,6 +43,7 @@ const MAP_NAME = 'Paste API Map';
 describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
   let mapId = 0n;
   let token = '';
+  let userId = 0;
 
   beforeAll(async () => {
     await migrate(db, { migrationsFolder: 'src/db/migrations' });
@@ -64,6 +65,7 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
       .values({ id: CORP, name: 'Paste API Corp' })
       .onConflictDoUpdate({ target: apCorporation.id, set: { name: 'Paste API Corp' } });
     const [u] = await db.insert(apUser).values({}).returning({ id: apUser.id });
+    userId = u!.id;
     await db
       .insert(apCharacter)
       .values({
@@ -189,6 +191,117 @@ describe.skipIf(!run)('POST /api/v1/signatures/paste', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.code).toBe('system_not_on_map');
+  });
+
+  it('returns insufficient_scope when the token lacks signatures_write', async () => {
+    const readOnly = generateUserApiToken();
+    await db.insert(apMapApiToken).values({
+      mapId,
+      userId,
+      tokenHash: readOnly.hash,
+      tokenPrefix: readOnly.prefix,
+      label: 'read',
+      scopes: ['signatures'],
+    });
+    const res = await pastePOST(
+      new NextRequest('http://localhost/api/v1/signatures/paste', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${readOnly.token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ systemId: SYSTEM_ID, text: SCAN }),
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('insufficient_scope');
+  });
+
+  it('returns payload_too_large for oversized paste text', async () => {
+    const res = await pastePOST(
+      new NextRequest('http://localhost/api/v1/signatures/paste', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          systemId: SYSTEM_ID,
+          text: 'x'.repeat(65_537),
+        }),
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(413);
+    expect((await res.json()).code).toBe('payload_too_large');
+  });
+
+  it('returns paste_too_many_rows when more than 500 rows', async () => {
+    const line =
+      'UNO-708\tCosmic Signature\tWormhole\tUnstable Wormhole\t100.0%\t17.43 AU\n';
+    const res = await pastePOST(
+      new NextRequest('http://localhost/api/v1/signatures/paste', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ systemId: SYSTEM_ID, text: line.repeat(501) }),
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('paste_too_many_rows');
+  });
+
+  it('returns insufficient_scope when the map does not expose signatures_write', async () => {
+    await db.update(apMap).set({ apiScopes: ['signatures'] }).where(eq(apMap.id, mapId));
+    clearUserApiAuthCache();
+    invalidateUserApiMap(mapId);
+    const res = await pastePOST(
+      new NextRequest('http://localhost/api/v1/signatures/paste', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ systemId: SYSTEM_ID, text: SCAN }),
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('insufficient_scope');
+    await db
+      .update(apMap)
+      .set({ apiScopes: ['signatures_write'] })
+      .where(eq(apMap.id, mapId));
+    clearUserApiAuthCache();
+    invalidateUserApiMap(mapId);
+  });
+
+  it('returns system_not_on_map for a hidden system', async () => {
+    await db
+      .update(apMapSystem)
+      .set({ visible: false })
+      .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.systemId, SYSTEM_ID)));
+    const res = await pastePOST(
+      new NextRequest('http://localhost/api/v1/signatures/paste', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ systemId: SYSTEM_ID, text: SCAN }),
+      }),
+      { params: Promise.resolve({}) },
+    );
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe('system_not_on_map');
+    await db
+      .update(apMapSystem)
+      .set({ visible: true })
+      .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.systemId, SYSTEM_ID)));
   });
 
   it('returns not_scanner_data for garbage text', async () => {

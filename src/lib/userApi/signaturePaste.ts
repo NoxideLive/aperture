@@ -8,37 +8,54 @@ import { LAZY_DELETE_PASTE_OPTIONS } from '@/lib/map/applySignaturePaste';
 import { pasteSignatures } from '@/lib/map/mutations/bulkSignatures';
 import { parseSignaturePaste } from '@/lib/map/signatureParser';
 import { resolveSignatureRows } from '@/lib/map/signatureReader';
-import type { UserApiMutationServe, UserApiTokenRecord } from '@/types';
+import type { UserApiMutationOutcome, UserApiTokenRecord } from '@/types';
 import { apertureConfig } from '../../../aperture.config';
-import { clearUserApiProjections } from './cache';
-import { invalidateUserApiMap } from './authorize';
+import { invalidateUserApiProjection } from './cache';
 
 const bodySchema = z.object({
   systemId: z.number().int().positive(),
-  text: z
-    .string()
-    .min(1, 'Paste text is required.')
-    .max(apertureConfig.USER_API_SIGNATURE_PASTE_MAX_TEXT, 'Paste text is too large.'),
+  text: z.string().min(1, 'Paste text is required.'),
 });
 
+const MAX_PASTE_ROWS = 500;
+
 /** `POST /api/v1/signatures/paste` — lazy-delete signature paste for API tokens. */
-export const serveUserApiSignaturePaste: UserApiMutationServe = async (
+export async function serveUserApiSignaturePaste(
   request: NextRequest,
   record: UserApiTokenRecord,
-) => {
+): Promise<UserApiMutationOutcome> {
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    return { ok: false, status: 400, code: 'server_error', error: 'Invalid JSON.' };
+    return { ok: false, status: 400, code: 'invalid_request', error: 'Invalid JSON.' };
   }
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const tooLarge = issue?.code === 'too_big';
+    if (tooLarge) {
+      return {
+        ok: false,
+        status: 413,
+        code: 'payload_too_large',
+        error: 'Paste text is too large.',
+      };
+    }
     return {
       ok: false,
       status: 400,
-      code: 'server_error',
-      error: parsed.error.issues[0]?.message ?? 'Invalid input.',
+      code: 'invalid_request',
+      error: issue?.message ?? 'Invalid input.',
+    };
+  }
+
+  if (parsed.data.text.length > apertureConfig.USER_API_SIGNATURE_PASTE_MAX_TEXT) {
+    return {
+      ok: false,
+      status: 413,
+      code: 'payload_too_large',
+      error: 'Paste text is too large.',
     };
   }
 
@@ -51,12 +68,24 @@ export const serveUserApiSignaturePaste: UserApiMutationServe = async (
       error: 'The paste did not look like probe-scanner output.',
     };
   }
+  if (rows.length > MAX_PASTE_ROWS) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'paste_too_many_rows',
+      error: `At most ${MAX_PASTE_ROWS} signatures per paste.`,
+    };
+  }
 
   const [mapSystem] = await db
     .select({ id: apMapSystem.id })
     .from(apMapSystem)
     .where(
-      and(eq(apMapSystem.mapId, record.map.id), eq(apMapSystem.systemId, parsed.data.systemId)),
+      and(
+        eq(apMapSystem.mapId, record.map.id),
+        eq(apMapSystem.systemId, parsed.data.systemId),
+        eq(apMapSystem.visible, true),
+      ),
     )
     .limit(1);
   if (!mapSystem) {
@@ -87,19 +116,17 @@ export const serveUserApiSignaturePaste: UserApiMutationServe = async (
     return {
       ok: false,
       status: 400,
-      code: 'server_error',
+      code: 'invalid_request',
       error: result.error,
     };
   }
 
-  invalidateUserApiMap(record.map.id);
-  clearUserApiProjections();
+  invalidateUserApiProjection(record.map.id, 'signatures');
 
   return {
     ok: true,
     data: result.data.summary,
   };
-};
+}
 
-const ERROR_ACCESS_LOST =
-  "This token's owner can no longer view the map.";
+const ERROR_ACCESS_LOST = "This token's owner can no longer view the map.";

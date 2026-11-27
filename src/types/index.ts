@@ -296,8 +296,15 @@ export type UserApiErrorCode =
   | 'rate_limited'
   | 'scope_not_granted'
   | 'insufficient_scope'
+  | 'invalid_request'
+  | 'payload_too_large'
+  | 'paste_too_many_rows'
   | 'not_scanner_data'
   | 'system_not_on_map'
+  | 'slow_down'
+  | 'authorization_pending'
+  | 'access_denied'
+  | 'expired_token'
   | 'server_error';
 
 /**
@@ -662,7 +669,7 @@ export type UserApiRouteHandlers = {
 /** Success or failure from a user API write handler. */
 export type UserApiMutationOutcome =
   | { ok: true; data: unknown; status?: number }
-  | { ok: false; status: number; code: string; error: string };
+  | { ok: false; status: number; code: string; error: string; retryAfterSec?: number };
 
 /** Serves one authenticated `POST /api/v1/*` mutation. */
 export type UserApiMutationServe = (

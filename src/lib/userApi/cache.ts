@@ -128,6 +128,17 @@ export function clearUserApiProjections(): void {
   state.inflight.clear();
 }
 
+/** Drops cached projections for one map resource (all Blackout variants of `pilots` / `mass_log`). */
+export function invalidateUserApiProjection(mapId: bigint, resource: UserApiResource): void {
+  const prefix = `${mapId.toString()}:${resource}`;
+  for (const key of [...state.cache.keys()]) {
+    if (key === prefix || key.startsWith(`${prefix}:`)) state.cache.delete(key);
+  }
+  for (const key of [...state.inflight.keys()]) {
+    if (key === prefix || key.startsWith(`${prefix}:`)) state.inflight.delete(key);
+  }
+}
+
 /** Test seam: the number of cached projections. */
 export function __userApiProjectionCacheSize(): number {
   return state.cache.size;

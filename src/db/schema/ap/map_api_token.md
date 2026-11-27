@@ -1,6 +1,6 @@
 ## map_api_token.ts
 
-**Purpose:** The `ap_map_api_token` table — per-map, read-only user API bearer tokens, each owned by an account.
+**Purpose:** The `ap_map_api_token` table — per-map user API bearer tokens, each owned by an account. Scopes fixed at mint may include read scopes and `signatures_write` when the map exposes it.
 **File:** `src/db/schema/ap/map_api_token.ts`
 
 ---

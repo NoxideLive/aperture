@@ -67,8 +67,15 @@ const ERROR_TEXT: Record<UserApiErrorCode, string> = {
   rate_limited: 'Too many requests. Wait for Retry-After before sending another.',
   scope_not_granted: 'This token may not read this resource.',
   insufficient_scope: 'This token does not have the scope this endpoint needs.',
+  invalid_request: 'The request body is missing a field or is otherwise invalid.',
+  payload_too_large: 'The request body is too large.',
+  paste_too_many_rows: 'The paste contains too many signatures.',
   not_scanner_data: 'The paste did not look like probe-scanner output.',
   system_not_on_map: 'That solar system is not on this map.',
+  slow_down: 'Poll again after the interval.',
+  authorization_pending: 'Waiting for approval in the browser.',
+  access_denied: 'Authorization was denied.',
+  expired_token: 'This device code is unknown, expired or already used.',
   server_error: 'The server failed to build this response. Retry later.',
 };
 
@@ -271,6 +278,15 @@ async function preflight(methods: string, headers: string): Promise<Response> {
   });
 }
 
+function mutationMetricOutcome(outcome: UserApiMutationOutcome): UserApiRequestOutcome {
+  if (outcome.ok) return 'ok';
+  if (outcome.status === 429) return 'rate_limited';
+  if (outcome.status >= 500) return 'error';
+  if (outcome.status === 401) return 'unauthorized';
+  if (outcome.status === 403) return 'forbidden';
+  return 'error';
+}
+
 function mutationJson(
   outcome: UserApiMutationOutcome,
   rateHeaders: RateHeaders,
@@ -294,6 +310,9 @@ function mutationJson(
     'content-type': 'application/json',
   };
   if (outcome.status === 401) headers['www-authenticate'] = 'Bearer';
+  if (outcome.retryAfterSec !== undefined) {
+    headers['retry-after'] = String(outcome.retryAfterSec);
+  }
   const code = outcome.code as UserApiErrorCode;
   const error = ERROR_TEXT[code] ?? outcome.error;
   return new Response(JSON.stringify({ ok: false, error, code: outcome.code }), {
@@ -365,11 +384,7 @@ async function handleMutation(
 
   try {
     const outcome = await serve(request, record);
-    return finish(
-      endpoint,
-      outcome.ok ? 'ok' : 'forbidden',
-      mutationJson(outcome, rateHeaders),
-    );
+    return finish(endpoint, mutationMetricOutcome(outcome), mutationJson(outcome, rateHeaders));
   } catch (err) {
     const live = await isMapLive(record.map.id).catch(() => true);
     if (!live) {
@@ -447,12 +462,20 @@ export function userApiPublicRoute(
           failure(429, 'rate_limited', { retryAfterSec: gate.retryAfterSec }),
         );
       }
-      const outcome = await serve(request);
-      return finish(
-        endpoint,
-        outcome.ok ? 'ok' : 'forbidden',
-        mutationJson(outcome, {}),
-      );
+      try {
+        const outcome = await serve(request);
+        return finish(endpoint, mutationMetricOutcome(outcome), mutationJson(outcome, {}));
+      } catch (err) {
+        log.error('user API public route failed', { endpoint, err });
+        return finish(
+          endpoint,
+          'error',
+          mutationJson(
+            { ok: false, status: 500, code: 'server_error', error: ERROR_TEXT.server_error },
+            {},
+          ),
+        );
+      }
     }),
     OPTIONS: withApiMetrics(
       template,

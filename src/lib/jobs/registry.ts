@@ -15,6 +15,7 @@ import { sdeRefresh } from './tasks/sdeRefresh';
 import { signatureReap } from './tasks/signatureReap';
 import { sovFwRefresh } from './tasks/sovFwRefresh';
 import { systemStatsRefresh } from './tasks/systemStatsRefresh';
+import { userApiDeviceCleanup } from './tasks/userApiDeviceCleanup';
 import { webhookDispatch } from './tasks/webhookDispatch';
 
 /**
@@ -61,6 +62,7 @@ const modules: readonly JobModule[] = [
   eolExpiry,
   expiredConnections,
   mapPurge,
+  userApiDeviceCleanup,
   // Per-system stats refresh from ESI.
   systemStatsRefresh,
   sovFwRefresh,

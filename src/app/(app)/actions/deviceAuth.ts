@@ -1,6 +1,10 @@
 'use server';
 
-import { decideDeviceAuthorization, getDeviceSessionForUserCode, listDeviceApprovalMaps } from '@/lib/userApi/device';
+import {
+  decideDeviceAuthorization,
+  getDeviceSessionForUserCode,
+  listDeviceApprovalMaps,
+} from '@/lib/userApi/device';
 import { requireSession } from '@/lib/session';
 
 export async function getDeviceApprovalState(userCode: string) {
@@ -9,7 +13,7 @@ export async function getDeviceApprovalState(userCode: string) {
   if (!row || row.status !== 'pending' || row.expiresAt <= new Date()) {
     return { ok: false as const, error: 'This code is not waiting for approval.' };
   }
-  const maps = await listDeviceApprovalMaps(session.userId);
+  const maps = await listDeviceApprovalMaps(session.userId, row.requestedScopes);
   return {
     ok: true as const,
     data: {
@@ -23,9 +27,17 @@ export async function getDeviceApprovalState(userCode: string) {
 
 export async function submitDeviceApproval(input: {
   userCode: string;
-  mapId: string;
+  mapId?: string;
   approve: boolean;
 }) {
   const session = await requireSession();
-  return decideDeviceAuthorization(input, session.userId, BigInt(session.characterId));
+  const result = await decideDeviceAuthorization(input, session.userId, BigInt(session.characterId));
+  if (!result.ok) return result;
+  if (result.token) {
+    return {
+      ok: true as const,
+      data: { token: result.token, mapName: result.mapName ?? '' },
+    };
+  }
+  return { ok: true as const };
 }

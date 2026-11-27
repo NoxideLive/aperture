@@ -320,21 +320,24 @@ Success:
 
 | HTTP | `code` | Meaning |
 |---|---|---|
+| 400 | `invalid_request` | The JSON body is missing a field or is otherwise invalid. |
 | 400 | `not_scanner_data` | The text did not parse as scanner output. |
-| 404 | `system_not_on_map` | That solar system is not on the token's map. |
+| 400 | `paste_too_many_rows` | More than 500 signature rows in one paste. |
+| 404 | `system_not_on_map` | That solar system is not on the token's map, or the system is hidden on the map. |
 | 403 | `insufficient_scope` | The token or map does not grant `signatures_write`. |
+| 413 | `payload_too_large` | The paste text exceeds 65 536 characters. |
 
-Paste text is capped at 65 536 characters.
+Paste text is capped at 65 536 characters and 500 rows (same as the web bulk paste).
 
 ### Device authorization (`eves-little-copilot`)
 
 Desktop apps can mint a token without handling a password:
 
 1. `POST /api/v1/device/start` with `{ "client": "eves-little-copilot", "scopes": ["signatures", "signatures_write", ...] }` → `deviceCode`, `userCode`, `verificationUriComplete`, `interval`, `expiresIn` (about 10 minutes).
-2. Open `verificationUriComplete` in a browser while signed in with EVE SSO. Pick a map whose API is on and approve or deny.
-3. `POST /api/v1/device/token` with `{ "deviceCode": "..." }` (or `{ "userCode": "..." }` after approval) until the response includes `token`, `map`, `scopes`, `expiresAt`.
+2. Open `verificationUriComplete` in a browser while signed in with EVE SSO. Pick a map whose API is on and approve, or deny even when no map qualifies. On approve, the page also shows the minted `apu_…` token **once** for manual copy (same single-use consume as poll — whichever succeeds first wins).
+3. `POST /api/v1/device/token` with `{ "deviceCode": "..." }` only (RFC 8628 — never `userCode`) until the response includes `token`, `map`, `scopes`, `expiresAt`. Minted tokens default to a 90-day expiry like the web UI.
 
-Poll errors use `authorization_pending`, `slow_down`, `expired_token`, or `access_denied`. The raw token is returned **once** on the first successful poll, then the session is consumed.
+Poll errors use `authorization_pending`, `slow_down` (429 with `Retry-After`), `expired_token`, or `access_denied`. The raw token is returned **once** on the first successful poll or browser copy, then the session is consumed.
 
 Managers must expose each requested scope on the map in **Map Settings → API** before approval can succeed.
 
@@ -349,7 +352,9 @@ Managers must expose each requested scope on the map in **Map Settings → API**
 | 403 | `access_lost` | The owning account has no main character, or its main can no longer view the map or sign in. | Stop. |
 | 403 | `scope_not_granted` | The endpoint's read scope is not in the token's effective scopes. | Check `GET /api/v1/token`. |
 | 403 | `insufficient_scope` | A write endpoint's scope is not in the token's effective scopes. | Check `GET /api/v1/token`. |
+| 400 | `invalid_request` | A public/mutation JSON body is missing a field or is otherwise invalid. | Fix the body. |
 | 429 | `rate_limited` | A rate limit was hit. Carries `Retry-After`. | Wait for `Retry-After`. |
+| 429 | `slow_down` | Device poll interval not elapsed. Carries `Retry-After`. | Wait for `Retry-After`. |
 | 500 | `server_error` | The server failed to build the response, usually a brief database outage. | Retry with backoff. |
 | 404 | none | The operator has turned the whole API off (body has no `code`), or the path does not exist. | |
 

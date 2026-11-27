@@ -175,8 +175,9 @@ export function MapApiPanel({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        API tokens let your own tools read this map. A token is read-only, sees exactly what you
-        see, and stops working if you lose access to the map.{' '}
+        API tokens let your own tools read this map and, when you grant{' '}
+        <code className="text-xs">signatures_write</code>, upload probe-scanner pastes. A token sees
+        exactly what you see and stops working if you lose access to the map.{' '}
         <a
           href={API_REFERENCE_URL}
           target="_blank"
