@@ -185,6 +185,7 @@ async function claimPollInterval(
   intervalSec: number,
   now: Date,
 ): Promise<boolean> {
+  const pollNotBefore = new Date(now.getTime() - intervalSec * 1000);
   const result = await db.execute<{ id: string }>(sql`
     UPDATE ap_user_api_device
     SET last_poll_at = ${now}
@@ -192,7 +193,7 @@ async function claimPollInterval(
       AND status IN ('pending', 'approved')
       AND (
         last_poll_at IS NULL
-        OR last_poll_at <= ${now} - make_interval(secs => ${intervalSec})
+        OR last_poll_at <= ${pollNotBefore}
       )
     RETURNING id
   `);
